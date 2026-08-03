@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>WegLog – Wegpunkte-Tracker</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand">🧭 WegLog</div>
+    <div id="status" class="status">
+      <span id="gpsState" class="pill pill-off">GPS…</span>
+      <span id="trackState" class="pill pill-off">Aus</span>
+    </div>
+  </header>
+
+  <!-- Diagnose-Banner -->
+  <div id="banner" class="banner" hidden></div>
+
+  <!-- Setup / Berechtigung -->
+  <section id="permGate" class="gate">
+    <p>Diese App braucht deinen <b>Standort</b>, um Wegpunkte mit Uhrzeit und
+      Ortschaft aufzuzeichnen, solange du unterwegs bist.</p>
+    <button id="btnEnable" class="btn btn-primary">Standort erlauben</button>
+    <p id="permHint" class="hint"></p>
+    <p class="ver">Version v1</p>
+  </section>
+
+  <main id="app" hidden>
+    <nav class="tabs">
+      <button class="tab tab-active" data-view="live">Live</button>
+      <button class="tab" data-view="map">Karte</button>
+      <button class="tab" data-view="history">Verlauf</button>
+      <button class="tab" data-view="settings">⚙︎</button>
+    </nav>
+
+    <!-- LIVE -->
+    <section id="view-live" class="view">
+      <div class="live-card">
+        <div class="live-state">
+          <span id="liveStateLabel" class="state-label state-idle">Bereit</span>
+          <span id="liveSince" class="muted small"></span>
+        </div>
+        <div class="live-stats">
+          <div class="stat"><b id="statSpeed">–</b><span>km/h</span></div>
+          <div class="stat"><b id="statCount">0</b><span>Wegpunkte</span></div>
+          <div class="stat"><b id="statDist">0,0</b><span>km</span></div>
+        </div>
+        <div class="live-actions">
+          <button id="btnStart" class="btn btn-primary btn-big">▶ Start</button>
+          <button id="btnStop" class="btn btn-danger btn-big" hidden>■ Stopp</button>
+        </div>
+        <label class="wake-toggle">
+          <input type="checkbox" id="wakeLock" />
+          <span>Bildschirm während der Aufzeichnung wach halten</span>
+        </label>
+      </div>
+
+      <div id="liveList" class="all-list"></div>
+    </section>
+
+    <!-- KARTE -->
+    <section id="view-map" class="view" hidden>
+      <select id="mapSession" class="select"></select>
+      <div id="mapContainer"></div>
+    </section>
+
+    <!-- VERLAUF -->
+    <section id="view-history" class="view" hidden>
+      <div id="historyList" class="all-list"></div>
+    </section>
+
+    <!-- EINSTELLUNGEN -->
+    <section id="view-settings" class="view" hidden>
+      <label class="field">
+        <span>Intervall zu Fuß (&lt; <b id="walkMaxVal">7</b> km/h): alle <b id="walkIntVal">5</b> Min</span>
+        <input id="walkInt" type="range" min="1" max="15" step="1" value="5" />
+      </label>
+      <label class="field">
+        <span>Intervall Rad (7–25 km/h): alle <b id="bikeIntVal">2</b> Min</span>
+        <input id="bikeInt" type="range" min="1" max="10" step="1" value="2" />
+      </label>
+      <label class="field">
+        <span>Intervall Auto (&gt; 25 km/h): alle <b id="carIntVal">1</b> Min</span>
+        <input id="carInt" type="range" min="1" max="10" step="1" value="1" />
+      </label>
+      <label class="field">
+        <span>Pause erkennen nach <b id="pauseMinVal">3</b> Min Stillstand</span>
+        <input id="pauseMin" type="range" min="1" max="15" step="1" value="3" />
+      </label>
+      <label class="field">
+        <span><input type="checkbox" id="useGeocode" checked /> Ortsname per Internet nachschlagen (Nominatim)</span>
+        <small class="muted">Ohne Internet werden nur Koordinaten gespeichert.</small>
+      </label>
+      <p class="muted small">Karte &amp; Ortsnamen © OpenStreetMap-Mitwirkende.</p>
+    </section>
+  </main>
+
+  <!-- Detail-Sheet -->
+  <div id="sheet" class="sheet" hidden>
+    <div class="sheet-inner">
+      <button id="sheetClose" class="sheet-close">✕</button>
+      <h2 id="sheetName">–</h2>
+      <div id="sheetMeta" class="sheet-meta"></div>
+      <div class="sheet-actions">
+        <button id="sheetMapBtn" class="btn" hidden>🗺 Auf Karte</button>
+        <button id="sheetDelete" class="btn">🗑 Löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
