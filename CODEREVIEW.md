@@ -523,7 +523,37 @@ den vorherigen Stand her.
 
 ---
 
-## D. Kleinigkeiten
+## D. Kleinigkeiten — ✅ erledigt 05.08.2026
+
+> **Behoben, sechs von sieben wie vorgeschlagen.** Der Reihe nach:
+>
+> 1. **Versionsdisziplin.** `sw.js` hat eine `VERSION`-Konstante, aus der der
+>    Cache-Name gebildet wird; `index.html` zeigt dieselbe Zeichenkette. Weil
+>    zwei Stellen zwei Stellen bleiben, hält ein Test sie zusammen
+>    (`tests/version.test.js`), und im README steht die Freigabe-Checkliste.
+>    Im Lauf dieses Reviews ist die Version von `v1` auf `v8` gewandert — je
+>    Commit, der ausgelieferte Dateien anfasst.
+> 2. **`if (resp.ok)` vor dem `c.put`** — erledigt mit A1, in allen drei
+>    Cache-Pfaden.
+> 3. **`stopTracking`-Rückfall `{0,0}`** — weg. `finish(null)` beendet die
+>    Aufzeichnung beim letzten gültigen Wegpunkt und sagt es dem Nutzer, statt
+>    einen Punkt im Golf von Guinea zu setzen.
+> 4. **`geocodeKey`-Raster (~110 m)** — im README erwähnt, dazu ein Kommentar
+>    an der Funktion.
+> 5. **`fillMapSessionOptions`** — prüft jetzt über
+>    `[...sel.options].some(o => o.value === prev)`. Das war mit C3/D6 dringend
+>    geworden: die `id` ist seither eine UUID und kein Zeitstempel mehr.
+> 6. **`active.id`** — `crypto.randomUUID()`, mit Rückfall auf den Zeitstempel,
+>    falls die Umgebung sie nicht kennt.
+>
+> **Abweichung — Punkt 7 (`updateStatSpeed`) trifft so nicht zu.** Im alten
+> `app.js` stand `updateStatSpeed(speedKmh)` in Zeile 210 **hinter** dem
+> `if (trackState === 'moving')`-Block, nicht darin; es lief also bei jeder
+> ausgewerteten Position, auch in der Pause (und zeigte dort Werte nahe 0).
+> Es gab aber eine echte, benachbarte Macke: **nach dem Stoppen** blieb der
+> letzte Tempowert stehen, weil `renderLive` nur Anzahl und Strecke
+> zurücksetzte. Das ist behoben — ohne laufende Aufzeichnung steht dort jetzt
+> wieder „–".
 
 - `sw.js:5` — Cache heißt `weglog-v1`, `index.html:33` zeigt "Version v1". Wie in
   den Schwesterprojekten: eine Konstante, eine Checkliste im README. Bei einem

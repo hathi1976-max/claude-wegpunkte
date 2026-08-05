@@ -79,6 +79,18 @@ Am Handy im selben WLAN `http://<PC-IP>:5179` öffnen. Für GPS ist ein
 **sicherer Kontext** nötig: `localhost` gilt als sicher; über die IP braucht
 es **HTTPS** (z. B. Hosting wie GitHub Pages).
 
+## Vor jeder Freigabe (Checkliste)
+
+1. `VERSION` in `sw.js` hochzählen (`v8` → `v9` …).
+2. Dieselbe Zeichenkette in `index.html` bei `<p class="ver">` nachziehen.
+3. Neue Dateien unter `js/` in `SHELL` in `sw.js` eintragen — **sonst ist die
+   App offline kaputt**.
+4. `tests/test.html` aufrufen: muss „alle N Tests bestanden" melden. Die
+   Punkte 1 bis 3 werden dort mitgeprüft.
+5. Auf dem Gerät einmal neu laden und schauen, ob die Versionsanzeige unten im
+   Berechtigungs-Bildschirm die neue Nummer zeigt. Tut sie das nicht, hält der
+   alte Service Worker die alte Fassung fest.
+
 ## Auf dem Handy nutzen
 1. Seite öffnen (am besten über HTTPS-Hosting).
 2. „Standort erlauben" tippen.

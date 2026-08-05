@@ -347,3 +347,30 @@ ganze Oberfläche aufzubauen.
   Der 429-Test zeigt: kein Ortsname gesetzt, Punkt weiter in der
   Warteschlange, nach 59 s noch immer nicht nachgelegt — und nach Ablauf der
   Sperre kommt genau derselbe Punkt dran und bekommt seinen Namen.
+
+### 05.08.2026 — D: Kleinigkeiten
+
+**Geändert.**
+
+- `sw.js` hat eine `VERSION`-Konstante, aus der der Cache-Name gebildet wird;
+  `index.html` zeigt dieselbe Zeichenkette. Weil zwei Stellen zwei Stellen
+  bleiben, hält `tests/version.test.js` sie zusammen, und im README steht eine
+  Freigabe-Checkliste. Die Version ist im Lauf dieses Reviews von `v1` auf `v8`
+  gewandert — je Commit, der ausgelieferte Dateien anfasst.
+- `stopTracking` fällt nicht mehr auf `{latitude: 0, longitude: 0}` zurück. Der
+  Punkt liegt im Golf von Guinea und hätte die Streckenlänge um Tausende
+  Kilometer verfälscht und die Karte unbrauchbar gezoomt. Jetzt endet die
+  Aufzeichnung beim letzten gültigen Wegpunkt, mit einem Hinweis an den Nutzer.
+- `fillMapSessionOptions` baut keinen CSS-Selektor mehr aus einem Wert
+  zusammen, sondern sieht die Optionsliste durch. Das war inzwischen dringend:
+  seit D6 ist die `id` eine UUID und kein Zeitstempel mehr.
+- `active.id` kommt von `crypto.randomUUID()`, mit Rückfall auf den Zeitstempel.
+- `renderLive` setzt ohne laufende Aufzeichnung auch das Tempo auf „–" zurück.
+
+**Nebenbefund — ein Punkt des Reviews stimmt so nicht.** Der Review notierte,
+`updateStatSpeed` werde nur im `moving`-Zustand aufgerufen. Im alten `app.js`
+stand der Aufruf in Zeile 210 aber **hinter** dem `if (trackState === 'moving')`-
+Block, nicht darin; er lief also bei jeder ausgewerteten Position, auch in der
+Pause. Die benachbarte, echte Macke war eine andere: nach dem **Stoppen** blieb
+der letzte Tempowert stehen, weil `renderLive` nur Anzahl und Strecke
+zurücksetzte. Genau das ist jetzt behoben.

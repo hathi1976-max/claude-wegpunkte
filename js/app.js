@@ -95,6 +95,14 @@ function sessionById(id){
   return aufzeichnungen.find(s => String(s.id) === String(id));
 }
 
+/* Zwei Aufzeichnungen in derselben Millisekunde sind praktisch unmoeglich,
+   aber randomUUID kostet nichts. Faellt auf den Zeitstempel zurueck, falls
+   die Umgebung sie nicht kennt (aeltere Browser, unsicherer Kontext). */
+function neueId(now){
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return String(now);
+}
+
 // ---------- Tracking ----------
 function nimmWegpunktAuf(point){
   laufendeAufzeichnung.points.push(point);
@@ -155,7 +163,7 @@ function handlePositionError(err){
 
 function startTracking(){
   const now = Date.now();
-  laufendeAufzeichnung = { id: now, startTime: now, points: [], zustand: neuerZustand(now) };
+  laufendeAufzeichnung = { id: neueId(now), startTime: now, points: [], zustand: neuerZustand(now) };
   speicher.saveActive(laufendeAufzeichnung);
 
   navigator.geolocation.getCurrentPosition(
@@ -178,9 +186,18 @@ function startTracking(){
 
 function stopTracking(){
   if (!laufendeAufzeichnung) return;
+  /* coords darf null sein: dann endet die Aufzeichnung beim letzten gueltigen
+     Wegpunkt. Der frueher benutzte Rueckfall {0,0} ist ein Punkt im Golf von
+     Guinea – er verlaengerte die Strecke um Tausende Kilometer und zoomte die
+     Karte unbrauchbar. */
   const finish = coords => {
     const now = Date.now();
-    nimmWegpunktAuf(baueWegpunkt('stop', coords, 0, now));
+    if (coords){
+      nimmWegpunktAuf(baueWegpunkt('stop', coords, 0, now));
+    } else {
+      ui.zeigeBanner('Beim Stoppen war keine Position verfügbar. Die Aufzeichnung '
+        + 'endet beim letzten gültigen Wegpunkt.', 'warn', 10000);
+    }
     laufendeAufzeichnung.endTime = now;
     laufendeAufzeichnung.distanceKm = sessionDistanceKm(laufendeAufzeichnung.points);
     ruheZustand = { ...leerZustand(), lastRaw: laufendeAufzeichnung.zustand.lastRaw };
@@ -208,10 +225,7 @@ function stopTracking(){
   if (lastRaw){
     finish({ latitude: lastRaw.lat, longitude: lastRaw.lon, accuracy: lastRaw.acc });
   } else {
-    navigator.geolocation.getCurrentPosition(
-      pos => finish(pos.coords),
-      () => finish({ latitude: 0, longitude: 0, accuracy: 9999 })
-    );
+    navigator.geolocation.getCurrentPosition(pos => finish(pos.coords), () => finish(null));
   }
 }
 

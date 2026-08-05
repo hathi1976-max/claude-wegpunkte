@@ -134,6 +134,8 @@ export function renderLive(){
   if (!active){
     $('#statCount').textContent = '0';
     $('#statDist').textContent = '0,0';
+    // Sonst bliebe das Tempo der letzten Fahrt stehen, obwohl nichts laeuft
+    $('#statSpeed').textContent = '–';
     return;
   }
   $('#statCount').textContent = String(active.points.length);
@@ -261,7 +263,8 @@ export function fillMapSessionOptions(){
     opt.textContent = fmtDateTime(s.startTime) + ' · ' + fmtKm(s.distanceKm) + ' km';
     sel.appendChild(opt);
   });
-  if (sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
+  // Kein Selektor aus fremdem Wert zusammenbauen – die Liste selbst durchsehen
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
 }
 
 /* Der Hinweis unter der Karte. Nie innerHTML – hier landen auch Texte, die
