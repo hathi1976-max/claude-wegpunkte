@@ -30,7 +30,7 @@
       Ortschaft aufzuzeichnen, solange du unterwegs bist.</p>
     <button id="btnEnable" class="btn btn-primary">Standort erlauben</button>
     <p id="permHint" class="hint"></p>
-    <p class="ver">Version v2</p>
+    <p class="ver">Version v3</p>
   </section>
 
   <main id="app" hidden>
@@ -99,6 +99,17 @@
         <span><input type="checkbox" id="useGeocode" checked /> Ortsname per Internet nachschlagen (Nominatim)</span>
         <small class="muted">Ohne Internet werden nur Koordinaten gespeichert.</small>
       </label>
+      <h3 class="abschnitt">Daten</h3>
+      <div class="field">
+        <div class="knopfreihe">
+          <button id="btnSichern" class="btn">⬇ Alles sichern (JSON)</button>
+          <button id="btnEinlesen" class="btn">⬆ Sicherung einlesen</button>
+        </div>
+        <input id="dateiEinlesen" type="file" accept="application/json,.json" hidden />
+        <small class="muted">Eine Sicherung wird <b>ergänzt</b>, nicht ersetzt:
+          vorhandene Aufzeichnungen bleiben unangetastet.</small>
+      </div>
+
       <p class="muted small">Karte &amp; Ortsnamen © OpenStreetMap-Mitwirkende.</p>
     </section>
   </main>
@@ -111,6 +122,8 @@
       <div id="sheetMeta" class="sheet-meta"></div>
       <div class="sheet-actions">
         <button id="sheetMapBtn" class="btn" hidden>🗺 Auf Karte</button>
+        <button id="sheetGpx" class="btn" hidden>⬇ GPX</button>
+        <button id="sheetCsv" class="btn" hidden>⬇ CSV</button>
         <button id="sheetDelete" class="btn">🗑 Löschen</button>
       </div>
     </div>

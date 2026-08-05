@@ -9,6 +9,7 @@ import {
 } from './tracking.js';
 import * as speicher from './storage.js';
 import { erstelleGeocoder } from './geocode.js';
+import { alsSicherung, leseSicherung, vereine, zeitstempelName } from './export.js';
 import * as ui from './ui.js';
 
 let settings = speicher.loadSettings();
@@ -196,6 +197,42 @@ bindRange('bikeInt', 'bikeIntVal', 'bikeInt');
 bindRange('carInt', 'carIntVal', 'carInt');
 bindRange('pauseMin', 'pauseMinVal', 'pauseMin');
 bindRange('useGeocode', null, 'useGeocode', true);
+
+// ---------- Sichern und Einlesen ----------
+ui.$('#btnSichern').addEventListener('click', () => {
+  ui.starteDownload(
+    alsSicherung(aufzeichnungen, laufendeAufzeichnung),
+    `weglog-sicherung-${zeitstempelName(Date.now())}.json`,
+    'application/json',
+  );
+});
+
+ui.$('#btnEinlesen').addEventListener('click', () => ui.$('#dateiEinlesen').click());
+
+ui.$('#dateiEinlesen').addEventListener('change', async ev => {
+  const datei = ev.target.files && ev.target.files[0];
+  ev.target.value = '';   // damit dieselbe Datei erneut waehlbar bleibt
+  if (!datei) return;
+  try {
+    const eingelesen = leseSicherung(await datei.text());
+    // Die gerade laufende Aufzeichnung darf nicht als abgeschlossene Kopie
+    // im Verlauf landen, wenn die Sicherung waehrend der Fahrt entstand.
+    const ohneLaufende = laufendeAufzeichnung
+      ? eingelesen.filter(s => String(s.id) !== String(laufendeAufzeichnung.id))
+      : eingelesen;
+    const vorher = aufzeichnungen.length;
+    aufzeichnungen = vereine(aufzeichnungen, ohneLaufende);
+    speicher.saveHistory(aufzeichnungen);
+    ui.renderHistory();
+    ui.fillMapSessionOptions();
+    const neu = aufzeichnungen.length - vorher;
+    ui.zeigeBanner(
+      `Sicherung eingelesen: ${neu} neu, ${eingelesen.length - neu} schon vorhanden.`,
+      'ok', 8000);
+  } catch (e){
+    ui.zeigeBanner('Sicherung nicht lesbar: ' + e.message, 'error', 12000);
+  }
+});
 
 // ---------- Start / Stopp ----------
 ui.$('#btnStart').addEventListener('click', startTracking);

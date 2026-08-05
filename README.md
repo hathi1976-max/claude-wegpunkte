@@ -19,6 +19,13 @@ Uhrzeit und Ortschaft protokolliert – bis du sie aktiv stoppst.
 - **Karte**: aktive und vergangene Aufzeichnungen als Route mit Leaflet/OSM.
 - **Verlauf**: abgeschlossene Aufzeichnungen mit Dauer, Strecke, Wegpunkten;
   löschbar.
+- **Export**: jede Aufzeichnung als **GPX** (Spur als `trk`, Start/Pause/
+  Weiter/Ende zusätzlich als `wpt`; direkt in Komoot, Garmin oder OsmAnd
+  einlesbar) oder als **CSV** (Semikolon als Trenner, Komma als Dezimalzeichen,
+  UTF-8-BOM — öffnet in einer deutschen Tabellenkalkulation direkt richtig).
+  In den Einstellungen zusätzlich eine **Vollsicherung als JSON** und das
+  Gegenstück zum Wiedereinlesen. Eingelesen wird **ergänzend**: gleiche
+  Aufzeichnungen bleiben, wie sie sind, nichts wird überschrieben.
 
 ## Grenzen (wichtig für den echten Einsatz)
 - Ein **Browser-Tab im Hintergrund** (Bildschirm aus, App gewechselt) wird

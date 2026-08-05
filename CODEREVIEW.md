@@ -86,7 +86,37 @@ Aufzeichnung ist weg, ohne jede Meldung.
 4. **Zusammen mit A3 zu sehen:** Solange es keinen Export gibt, ist "Speicher
    voll" gleichbedeutend mit Datenverlust.
 
-### A3. Kein Export
+### A3. Kein Export — ✅ erledigt 05.08.2026
+
+> **Behoben.** Neues Modul `js/export.js`, ohne fremde Bibliothek und ohne DOM
+> (es liefert nur Text zurück, das Herunterladen macht `ui.starteDownload`
+> über einen kurzlebigen Blob-Link).
+>
+> - **GPX** und **CSV** je Aufzeichnung, als zwei zusätzliche Knöpfe im
+>   Detail-Sheet. Das GPX hat die Spur als `<trk>` und die markanten Punkte
+>   (Start, Pause, Weiter, Ende) zusätzlich als `<wpt>` mit Namen — so bleiben
+>   sie in Komoot/OsmAnd sichtbar, ohne die Spur zu zerreißen.
+> - **Vollsicherung als JSON** und **Wiedereinlesen** in den Einstellungen.
+>   Eingelesen wird **ergänzend**: gleiche `id` gewinnt der Bestand, nichts
+>   wird überschrieben oder gelöscht. Die gerade laufende Aufzeichnung wird
+>   beim Einlesen ausgefiltert, damit sie nicht als abgeschlossene Kopie im
+>   Verlauf landet.
+>
+> **Über die Vorlage hinaus**, weil Exporte Fremdtext transportieren:
+> Ortsnamen kommen von Nominatim (siehe B1) und werden im GPX über `xmlEsc`
+> entschärft (fünf XML-Sonderzeichen plus die in XML verbotenen
+> Steuerzeichen); im CSV werden sie quotiert und ein führendes `= + - @`
+> bekommt einen Apostroph vorangestellt, damit die Tabellenkalkulation den
+> Namen nicht als Formel ausführt. Das CSV ist bewusst deutsch (Semikolon als
+> Trenner, Komma als Dezimalzeichen, UTF-8-BOM) — die maschinenlesbare
+> Fassung ist GPX.
+>
+> **Geprüft:** 27 Tests in `tests/export.test.js`, darunter ein Durchlauf
+> durch `DOMParser`, der bestätigt, dass das erzeugte GPX auch mit einem
+> Ortsnamen wie `<img src=x onerror="alert(1)">Böse; Stadt "A"`
+> wohlgeformtes XML bleibt und der Name als **Text** ankommt (0 `<img>`-
+> Elemente im Ergebnis), sowie ein kleiner CSV-Leser im Test, der die
+> Quotierung nachweist (7 Felder trotz Semikolon im Ortsnamen).
 
 Der gesamte Zweck der App ist das Festhalten von Wegen — es gibt aber keine
 Möglichkeit, sie aus dem Browser herauszubekommen. Ein Wechsel des Geräts, ein
@@ -234,7 +264,7 @@ sichtbar, wo Daten fehlen, statt eine gerade Linie durch die Landschaft zu ziehe
 > `<script type="module" src="js/app.js">`, alle sieben Dateien stehen in
 > `SHELL` in `sw.js` — die App bleibt offline vollständig.
 >
-> Aus null Tests sind **44** geworden (Stand dieses Schritts), in `tests/` mit
+> Aus null Tests sind **45** geworden (Stand dieses Schritts), in `tests/` mit
 > eigenem, abhängigkeitsfreiem Läufer (`tests/lauf.js`), aufrufbar über
 > `tests/test.html` im Browser — auf diesem Rechner gibt es weder node noch
 > npm. Abgedeckt: `haversine`, `sessionDistanceKm`, `computeSpeedKmh` samt

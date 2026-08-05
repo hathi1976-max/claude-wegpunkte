@@ -3,6 +3,7 @@
 
 import { sessionDistanceKm } from './geo.js';
 import { typeIcon, typeLabel, fmtTime, fmtDateTime, fmtDuration, fmtKm } from './format.js';
+import { alsGpx, alsCsv, dateiname } from './export.js';
 
 export const $ = sel => document.querySelector(sel);
 
@@ -27,9 +28,48 @@ export function verbinde(kontext){
     }
     closeSheet();
   });
+  $('#sheetGpx').addEventListener('click', () => {
+    if (sheetContext?.kind !== 'session') return;
+    const s = sheetContext.session;
+    starteDownload(alsGpx(s), dateiname(s, 'gpx'), 'application/gpx+xml');
+  });
+  $('#sheetCsv').addEventListener('click', () => {
+    if (sheetContext?.kind !== 'session') return;
+    const s = sheetContext.session;
+    // BOM voran, sonst zeigt Excel Umlaute in Ortsnamen falsch an
+    starteDownload('\uFEFF' + alsCsv(s), dateiname(s, 'csv'), 'text/csv;charset=utf-8');
+  });
   $('#mapSession').addEventListener('change', renderMap);
   document.querySelectorAll('.tab').forEach(t =>
     t.addEventListener('click', () => setActiveTab(t.dataset.view)));
+}
+
+/* Herunterladen ueber einen kurzlebigen Blob-Link – ohne Server, ohne Bibliothek. */
+export function starteDownload(inhalt, name, mime){
+  const url = URL.createObjectURL(new Blob([inhalt], { type: mime }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ---------- Banner ----------
+let bannerTimer = null;
+
+/* art: 'ok' | 'warn' | 'error'. dauerMs = 0 laesst den Hinweis stehen. */
+export function zeigeBanner(text, art = 'warn', dauerMs = 0){
+  const el = $('#banner');
+  el.className = 'banner ' + art;
+  el.textContent = text;             // Fremdtext nie als HTML (B1)
+  el.hidden = false;
+  clearTimeout(bannerTimer);
+  if (dauerMs) bannerTimer = setTimeout(() => { el.hidden = true; }, dauerMs);
+}
+
+export function versteckeBanner(){
+  clearTimeout(bannerTimer);
+  $('#banner').hidden = true;
 }
 
 // ---------- Statusanzeigen ----------
@@ -140,9 +180,15 @@ export function openPointSheet(p){
     <div><span class="k">Geschwindigkeit</span><span>${p.speedKmh.toFixed(1)} km/h</span></div>
     <div><span class="k">GPS-Genauigkeit</span><span>±${Math.round(p.acc||0)} m</span></div>
   `;
-  $('#sheetMapBtn').hidden = true;
-  $('#sheetDelete').hidden = true;
+  zeigeSheetKnoepfe(false);
   $('#sheet').hidden = false;
+}
+
+function zeigeSheetKnoepfe(fuerAufzeichnung){
+  $('#sheetMapBtn').hidden = !fuerAufzeichnung;
+  $('#sheetDelete').hidden = !fuerAufzeichnung;
+  $('#sheetGpx').hidden = !fuerAufzeichnung;
+  $('#sheetCsv').hidden = !fuerAufzeichnung;
 }
 
 export function openSessionSheet(session){
@@ -154,8 +200,7 @@ export function openSessionSheet(session){
     <div><span class="k">Strecke</span><span>${fmtKm(session.distanceKm)} km</span></div>
     <div><span class="k">Wegpunkte</span><span>${session.points.length}</span></div>
   `;
-  $('#sheetMapBtn').hidden = false;
-  $('#sheetDelete').hidden = false;
+  zeigeSheetKnoepfe(true);
   $('#sheet').hidden = false;
 }
 

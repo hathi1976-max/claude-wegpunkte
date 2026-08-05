@@ -97,6 +97,13 @@ body{
 /* Settings */
 .field{display:flex; flex-direction:column; gap:6px; margin-bottom:18px}
 .field input[type=range]{width:100%}
+.abschnitt{font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);
+  margin:26px 0 10px; padding-top:14px; border-top:1px solid var(--line)}
+.knopfreihe{display:flex; gap:10px; flex-wrap:wrap}
+.knopfreihe .btn{flex:1 1 auto; min-width:44%}
+.speicherbalken{height:8px; background:var(--bg3); border-radius:999px; overflow:hidden}
+.speicherbalken i{display:block; height:100%; background:var(--accent); width:0}
+.speicherbalken.voll i{background:var(--danger)}
 
 /* Sheet */
 .sheet{position:fixed; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:flex-end; z-index:50}
@@ -106,5 +113,5 @@ body{
 .sheet-meta{display:flex; flex-direction:column; gap:6px; margin-bottom:16px}
 .sheet-meta div{display:flex; justify-content:space-between; border-bottom:1px solid var(--line); padding-bottom:6px}
 .sheet-meta .k{color:var(--muted)}
-.sheet-actions{display:flex; gap:10px}
-.sheet-actions .btn{flex:1}
+.sheet-actions{display:flex; gap:10px; flex-wrap:wrap}
+.sheet-actions .btn{flex:1 1 auto; min-width:30%}

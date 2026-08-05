@@ -16,6 +16,7 @@ claude-wegpunkte/
 │   ├── storage.js        localStorage, Speicher injizierbar
 │   ├── geocode.js        Reverse-Geocoding über Nominatim (gedrosselt, gecacht)
 │   ├── format.js         Anzeigetexte (Zeit, Dauer, km, Symbole)
+│   ├── export.js         GPX, CSV, JSON-Sicherung (rein, ohne DOM)
 │   └── ui.js             alles, was das DOM anfasst
 ├── tests/
 │   ├── test.html         Testlauf im Browser (kein node auf dem Zielrechner)
@@ -23,6 +24,7 @@ claude-wegpunkte/
 │   ├── geo.test.js       Geometrie und Formatierung
 │   ├── tracking.test.js  Zustandsmaschine, Zustandsherstellung, Differenztest
 │   ├── storage.test.js   Persistenz gegen eine Speicher-Attrappe
+│   ├── export.test.js    GPX/CSV/Sicherung, inkl. Fremdtext mit Markup
 │   └── referenz-alt.js   eingefrorene Tracking-Logik von vor dem Modul-Umbau
 ├── sw.js                 Service Worker (Offline-Cache der App-Shell)
 ├── manifest.webmanifest  PWA-Manifest
@@ -124,8 +126,51 @@ Neu: `tests/` mit eigenem Läufer und `tests/test.html`.
   aber `paused` — die alte Rekonstruktion hätte die Pause beim Neuladen
   verloren.
 
-**Nebenbefund.** Der Review verortete den Schreibaufwand nicht, aber der
+**Nebenbefund (C3).** Der Review verortete den Schreibaufwand nicht, aber der
 naheliegende Weg — den Zustand bei jeder GPS-Position mitspeichern — wäre
 teuer: `enableHighAccuracy` liefert alle paar Sekunden eine Position. Gespeichert
 wird deshalb nur, wenn ohnehin ein Wegpunkt fällt oder sich `zustand` bzw.
 `pauseSince` ändert.
+
+### 05.08.2026 — A3: Export (GPX, CSV, Vollsicherung)
+
+**Geändert.** Neues Modul `js/export.js` — ohne fremde Bibliothek und ohne DOM,
+es liefert ausschließlich Text. Das Herunterladen macht `ui.starteDownload`
+über einen Blob-Link, der nach einer Sekunde wieder freigegeben wird.
+
+- `alsGpx(session)` — Spur als `<trk><trkseg>`, dazu die markanten Punkte
+  (alles außer `log`) als `<wpt>` mit Namen aus Punktart und Ortsname.
+- `alsCsv(session)` — Kopfzeile `Zeit;Typ;Ort;Breite;Laenge;km/h;Genauigkeit_m`,
+  deutsche Zahlen, CRLF, beim Download ein UTF-8-BOM voran.
+- `alsSicherung` / `leseSicherung` / `vereine` — JSON-Vollsicherung samt
+  Wiedereinlesen. `bereinige()` wirft Laufzeitfelder (`zustand`) und unbekannte
+  Felder weg und rechnet eine fehlende Streckenlänge nach.
+
+Zwei Dinge, die die Vorlage im Review nicht vorsah, aber nötig sind:
+
+1. **Fremdtext im Export.** Ortsnamen stammen von Nominatim. `xmlEsc` entschärft
+   die fünf XML-Sonderzeichen und entfernt die in XML schlicht verbotenen
+   Steuerzeichen (`\x00-\x08`, `\x0B`, `\x0C`, `\x0E-\x1F`) — sonst ist die
+   Datei nicht bloß hässlich, sondern unparsbar. Im CSV wird quotiert **und**
+   ein führendes `= + - @` mit einem Apostroph entschärft, sonst führt die
+   Tabellenkalkulation den Ortsnamen als Formel aus.
+2. **Einlesen ergänzt, es ersetzt nicht.** `vereine` vergleicht über die `id`
+   (als Zeichenkette, damit alte Zahlen-`id`s und neue passen) und behält im
+   Zweifel den Bestand. Eine Sicherung einzulesen kann damit nichts löschen.
+   Die gerade laufende Aufzeichnung wird vor dem Zusammenführen ausgefiltert,
+   sonst läge sie nach dem Einlesen doppelt vor — einmal laufend, einmal als
+   abgeschlossene Kopie aus der Sicherung.
+
+**Geprüft.** 27 Tests in `tests/export.test.js`. Die beiden aussagekräftigsten:
+
+- Das erzeugte GPX läuft im Test durch `DOMParser`. Mit dem Ortsnamen
+  `<img src=x onerror="alert(1)">Böse; Stadt "A"` bleibt es wohlgeformt
+  (0 `parsererror`), der Name kommt als **Text** an und der Baum enthält
+  **0 `<img>`-Elemente**.
+- Ein kleiner CSV-Leser im Test zerlegt die Zeile mit demselben Ortsnamen
+  wieder: 7 Felder, Feld 3 exakt der Ursprungstext — die Quotierung hält,
+  obwohl der Name Semikolon und Anführungszeichen enthält.
+
+Dazu Rundlauf der Sicherung (Werte identisch, `zustand` nicht in der Datei),
+Ablehnung kaputter/fremder/leerer Dateien, Nachrechnen einer fehlenden
+Streckenlänge (111,195 km für einen Breitengrad) und vier Fälle für `vereine`.
