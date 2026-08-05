@@ -12,7 +12,7 @@
 
    Nominatim wird nie gecacht – Ortsnamen sind Live-Abfragen. */
 
-const VERSION = 'v6';
+const VERSION = 'v7';
 const CACHE = 'weglog-' + VERSION;
 const VENDOR = 'weglog-vendor-leaflet-1.9.4';
 const KACHELN = 'weglog-kacheln-v1';

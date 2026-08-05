@@ -298,3 +298,52 @@ ersten Wegpunkt einer Aufzeichnung mit Zeitbasis 0 fälschlich durchgelassen.
 
 B2 und B3 hängen an DOM, Netz und Betriebssystem und sind nicht automatisch
 geprüft; sie stehen als Klickpfade in der Prüfliste am Ende dieser Datei.
+
+### 05.08.2026 — B1, B4: Fremdtext und Nominatim-Konformität
+
+**B1 — kein `innerHTML` mehr.** Der Review bot zwei Wege an: eine eigene
+`esc()`-Funktion oder `textContent`. Gewählt ist `textContent`, und zwar
+durchgängig: eine Escape-Funktion muss man richtig schreiben *und* an jeder
+Stelle anwenden, `textContent` kann man dagegen nicht falsch anwenden.
+
+`js/ui.js` enthält jetzt kein einziges `innerHTML` mehr (nur noch zwei
+Kommentare erwähnen es). Neue Bausteine: `el(tag, klasse, text)`,
+`ortText(p, settings)`, `metaZeile`, `setzeMeta`, `popupInhalt`. Listen werden
+über `replaceChildren()` geleert.
+
+Der unangenehmste Fall war das Karten-Popup: `bindPopup` bekam eine
+HTML-Zeichenkette mit dem Ortsnamen darin. Leaflet nimmt aber auch ein
+`HTMLElement` — `popupInhalt(p)` baut eines.
+
+`pointItemEl` bekommt die Einstellungen als Parameter statt aus dem
+Modulzustand. Nur dadurch sind die Bau-Funktionen einzeln testbar, ohne die
+ganze Oberfläche aufzubauen.
+
+**B4 — Nominatim.** Kennung, Drosselung und Abfuhr:
+
+- `baueUrl(lat, lon, kontakt)` hängt `&email=…` an, wenn in den Einstellungen
+  eine Kontaktadresse steht. **Nicht vorbelegt** — die Adresse gehört dem
+  Nutzer, eine erfundene Kennung wäre schlechter als gar keine.
+- 429 **und** 403 legen die Warteschlange 60 s still (`SPERRE_MS`); der Punkt
+  wandert per `unshift` an den Anfang zurück statt verlorenzugehen.
+- `fetchFn`, Uhr und Wartefunktion sind hineinreichbar. Ohne das wäre ein Test
+  der Drosselung entweder sekundenlang oder gar nicht möglich.
+- Nebenbefund: `(unbekannt)` wurde bisher in den Cache geschrieben. Ein
+  einzelner Serverfehler hätte damit für dieses 110-m-Rasterfeld dauerhaft
+  festgelegt, dass es dort keinen Ort gibt. Jetzt wandern nur echte Namen in
+  den Cache.
+
+**Geprüft.**
+
+- 13 Tests in `tests/ui.test.js` mit dem Ortsnamen
+  `<img src=x onerror="window.__B1=1">Bad <b>Fett</b> &amp;amp; Co`. Der Eintrag
+  wird dafür wirklich ins Dokument gehängt — außerhalb des Dokuments liefe
+  `onerror` gar nicht erst los und der Test wäre wertlos. Ergebnis: 0
+  `img`-Elemente, 0 `b`-Elemente, `window.__B1` bleibt `undefined`, und der
+  Name kommt zeichengenau wieder heraus (das `&amp;amp;` bleibt eine
+  Zeichenfolge und wird nicht zu `&`).
+- 15 Tests in `tests/geocode.test.js`, **ohne eine einzige echte Anfrage**.
+  Der Drosselungs-Test zeigt: nach 1 099 ms eine Anfrage, nach 1 100 ms zwei.
+  Der 429-Test zeigt: kein Ortsname gesetzt, Punkt weiter in der
+  Warteschlange, nach 59 s noch immer nicht nachgelegt — und nach Ablauf der
+  Sperre kommt genau derselbe Punkt dran und bekommt seinen Namen.

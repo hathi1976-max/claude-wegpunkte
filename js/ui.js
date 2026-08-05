@@ -59,12 +59,12 @@ let bannerTimer = null;
 
 /* art: 'ok' | 'warn' | 'error'. dauerMs = 0 laesst den Hinweis stehen. */
 export function zeigeBanner(text, art = 'warn', dauerMs = 0){
-  const el = $('#banner');
-  el.className = 'banner ' + art;
-  el.textContent = text;             // Fremdtext nie als HTML (B1)
-  el.hidden = false;
+  const kasten = $('#banner');
+  kasten.className = 'banner ' + art;
+  kasten.textContent = text;             // Fremdtext nie als HTML (B1)
+  kasten.hidden = false;
   clearTimeout(bannerTimer);
-  if (dauerMs) bannerTimer = setTimeout(() => { el.hidden = true; }, dauerMs);
+  if (dauerMs) bannerTimer = setTimeout(() => { kasten.hidden = true; }, dauerMs);
 }
 
 export function versteckeBanner(){
@@ -130,7 +130,7 @@ export function updateStatSpeed(speedKmh){
 export function renderLive(){
   const active = ctx.getAktive();
   const list = $('#liveList');
-  list.innerHTML = '';
+  list.replaceChildren();
   if (!active){
     $('#statCount').textContent = '0';
     $('#statDist').textContent = '0,0';
@@ -141,63 +141,84 @@ export function renderLive(){
   [...active.points].reverse().forEach(p => list.appendChild(pointItemEl(p)));
 }
 
-export function pointItemEl(p){
-  const el = document.createElement('div');
-  el.className = 'item ' + p.type;
-  const sub = p.place
-    ? p.place
-    : (ctx.getSettings().useGeocode ? 'Ort wird ermittelt …' : p.lat.toFixed(4)+', '+p.lon.toFixed(4));
-  el.innerHTML = `
-    <span class="ico">${typeIcon(p.type)}</span>
-    <span class="body">
-      <span class="name">${typeLabel(p.type)} · ${fmtTime(p.t)}</span>
-      <span class="sub">${sub}</span>
-    </span>
-    <span class="dist">${p.speedKmh.toFixed(1)} km/h</span>
-  `;
-  el.addEventListener('click', () => openPointSheet(p));
-  return el;
+/* Ortsnamen kommen von Nominatim und sind damit von beliebigen Personen
+   editierbarer Fremdtext. Deshalb wird hier nirgends innerHTML gesetzt,
+   sondern gebaut – dann ist ein Name mit Markup schlicht ein Name (B1). */
+export function el(tag, klasse, text){
+  const e = document.createElement(tag);
+  if (klasse) e.className = klasse;
+  if (text !== undefined && text !== null) e.textContent = String(text);
+  return e;
+}
+
+export function ortText(p, settings){
+  if (p.place) return p.place;
+  if (settings && settings.useGeocode) return 'Ort wird ermittelt …';
+  return p.lat.toFixed(4) + ', ' + p.lon.toFixed(4);
+}
+
+export function pointItemEl(p, settings = ctx.getSettings()){
+  const e = el('div', 'item ' + p.type);
+  e.appendChild(el('span', 'ico', typeIcon(p.type)));
+  const body = el('span', 'body');
+  body.appendChild(el('span', 'name', typeLabel(p.type) + ' · ' + fmtTime(p.t)));
+  body.appendChild(el('span', 'sub', ortText(p, settings)));
+  e.appendChild(body);
+  e.appendChild(el('span', 'dist', p.speedKmh.toFixed(1) + ' km/h'));
+  e.addEventListener('click', () => openPointSheet(p));
+  return e;
 }
 
 // ---------- Verlauf ----------
 export function renderHistory(){
   const aufzeichnungen = ctx.getAufzeichnungen();
   const list = $('#historyList');
-  list.innerHTML = '';
+  list.replaceChildren();
   if (aufzeichnungen.length === 0){
-    list.innerHTML = '<p class="muted">Noch keine abgeschlossenen Aufzeichnungen.</p>';
+    list.appendChild(el('p', 'muted', 'Noch keine abgeschlossenen Aufzeichnungen.'));
     return;
   }
   aufzeichnungen.forEach(session => list.appendChild(sessionItemEl(session)));
 }
 
 export function sessionItemEl(session){
-  const el = document.createElement('div');
-  el.className = 'item';
-  const dur = fmtDuration((session.endTime || Date.now()) - session.startTime);
-  el.innerHTML = `
-    <span class="ico">🧭</span>
-    <span class="body">
-      <span class="name">${fmtDateTime(session.startTime)}</span>
-      <span class="sub">${dur} · ${fmtKm(session.distanceKm)} km · ${session.points.length} Wegpunkte</span>
-    </span>
-  `;
-  el.addEventListener('click', () => openSessionSheet(session));
-  return el;
+  const e = el('div', 'item');
+  const dauer = fmtDuration((session.endTime || Date.now()) - session.startTime);
+  e.appendChild(el('span', 'ico', '🧭'));
+  const body = el('span', 'body');
+  body.appendChild(el('span', 'name', fmtDateTime(session.startTime)));
+  body.appendChild(el('span', 'sub',
+    `${dauer} · ${fmtKm(session.distanceKm)} km · ${session.points.length} Wegpunkte`));
+  e.appendChild(body);
+  e.addEventListener('click', () => openSessionSheet(session));
+  return e;
 }
 
 // ---------- Detail-Sheet ----------
 export function openPointSheet(p){
   sheetContext = { kind: 'point', point: p };
   $('#sheetName').textContent = typeLabel(p.type) + ' · ' + fmtTime(p.t);
-  $('#sheetMeta').innerHTML = `
-    <div><span class="k">Ort</span><span>${p.place || '–'}</span></div>
-    <div><span class="k">Koordinaten</span><span>${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</span></div>
-    <div><span class="k">Geschwindigkeit</span><span>${p.speedKmh.toFixed(1)} km/h</span></div>
-    <div><span class="k">GPS-Genauigkeit</span><span>±${Math.round(p.acc||0)} m</span></div>
-  `;
+  setzeMeta([
+    ['Ort', p.place || '–'],
+    ['Koordinaten', p.lat.toFixed(5) + ', ' + p.lon.toFixed(5)],
+    ['Geschwindigkeit', p.speedKmh.toFixed(1) + ' km/h'],
+    ['GPS-Genauigkeit', '±' + Math.round(p.acc || 0) + ' m'],
+  ]);
   zeigeSheetKnoepfe(false);
   $('#sheet').hidden = false;
+}
+
+/* Baut die Schluessel/Wert-Zeilen des Sheets. Der Wert kann Fremdtext sein. */
+export function metaZeile(schluessel, wert){
+  const zeile = el('div');
+  zeile.appendChild(el('span', 'k', schluessel));
+  zeile.appendChild(el('span', null, wert));
+  return zeile;
+}
+
+export function setzeMeta(paare){
+  const ziel = $('#sheetMeta');
+  ziel.replaceChildren(...paare.map(([k, v]) => metaZeile(k, v)));
 }
 
 function zeigeSheetKnoepfe(fuerAufzeichnung){
@@ -211,11 +232,11 @@ export function openSessionSheet(session){
   sheetContext = { kind: 'session', session };
   const dur = fmtDuration((session.endTime || Date.now()) - session.startTime);
   $('#sheetName').textContent = fmtDateTime(session.startTime);
-  $('#sheetMeta').innerHTML = `
-    <div><span class="k">Dauer</span><span>${dur}</span></div>
-    <div><span class="k">Strecke</span><span>${fmtKm(session.distanceKm)} km</span></div>
-    <div><span class="k">Wegpunkte</span><span>${session.points.length}</span></div>
-  `;
+  setzeMeta([
+    ['Dauer', dur],
+    ['Strecke', fmtKm(session.distanceKm) + ' km'],
+    ['Wegpunkte', String(session.points.length)],
+  ]);
   zeigeSheetKnoepfe(true);
   $('#sheet').hidden = false;
 }
@@ -226,7 +247,7 @@ export function closeSheet(){ $('#sheet').hidden = true; sheetContext = null; }
 export function fillMapSessionOptions(){
   const sel = $('#mapSession');
   const prev = sel.value;
-  sel.innerHTML = '';
+  sel.replaceChildren();
   const active = ctx.getAktive();
   if (active){
     const opt = document.createElement('option');
@@ -246,9 +267,21 @@ export function fillMapSessionOptions(){
 /* Der Hinweis unter der Karte. Nie innerHTML – hier landen auch Texte, die
    von Kachel- und Netzfehlern kommen. */
 export function setzeKartenHinweis(text){
-  const el = $('#mapHinweis');
-  el.textContent = text || '';
-  el.hidden = !text;
+  const kasten = $('#mapHinweis');
+  kasten.textContent = text || '';
+  kasten.hidden = !text;
+}
+
+/* Leaflet nimmt fuer bindPopup auch ein Element – damit landet der Ortsname
+   als Text im Popup und nicht als Markup. */
+export function popupInhalt(p){
+  const box = el('div');
+  box.appendChild(el('b', null, typeLabel(p.type)));
+  box.appendChild(document.createElement('br'));
+  box.appendChild(document.createTextNode(fmtTime(p.t) + (p.place ? ' · ' + p.place : '')));
+  box.appendChild(document.createElement('br'));
+  box.appendChild(document.createTextNode(p.speedKmh.toFixed(1) + ' km/h'));
+  return box;
 }
 
 export function renderMap(){
@@ -299,8 +332,7 @@ export function renderMap(){
       resume: '#3fb950', luecke: '#a371f7',
     }[p.type] || '#4aa8ff';
     const marker = L.circleMarker([p.lat, p.lon], { radius: 6, color, fillColor: color, fillOpacity: 0.9 });
-    marker.bindPopup(`<b>${typeLabel(p.type)}</b><br>${fmtTime(p.t)}`
-      + `${p.place ? ' · ' + p.place : ''}<br>${p.speedKmh.toFixed(1)} km/h`);
+    marker.bindPopup(popupInhalt(p));   // Element statt HTML-Zeichenkette (B1)
     marker.addTo(group);
   });
   group.addTo(currentMap);

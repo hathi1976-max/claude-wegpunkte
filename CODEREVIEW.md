@@ -229,7 +229,33 @@ des gesamten Verlaufs) samt Gegenstück zum Wiedereinlesen.
 
 ## B. Korrektheit
 
-### B1. Externe Ortsnamen landen ungefiltert im HTML
+### B1. Externe Ortsnamen landen ungefiltert im HTML — ✅ erledigt 05.08.2026
+
+> **Behoben — über `textContent`, nicht über eine eigene `esc()`-Funktion.**
+> Der Review nannte beides und hielt `textContent` für den besseren Weg; das
+> ist es auch: eine selbstgebaute Escape-Funktion muss man richtig schreiben
+> *und* an jeder Stelle anwenden, `textContent` kann man dagegen nicht falsch
+> anwenden. In `js/ui.js` gibt es jetzt **kein einziges `innerHTML` mehr**
+> (Gegenprobe: `grep innerHTML js/` findet nur noch zwei Kommentare).
+>
+> Ersetzt wurden: `pointItemEl`, `sessionItemEl`, `renderHistory`,
+> `openPointSheet`/`openSessionSheet` (über `setzeMeta`/`metaZeile`),
+> `fillMapSessionOptions` und das Karten-Popup. Letzteres war der unangenehmste
+> Fall — `bindPopup` bekam eine HTML-Zeichenkette. Leaflet nimmt aber auch ein
+> `HTMLElement`, also baut `popupInhalt(p)` jetzt eines.
+>
+> Neue Bausteine: `el(tag, klasse, text)` (setzt immer `textContent`),
+> `ortText(p, settings)`, `metaZeile`, `popupInhalt`. `pointItemEl` bekommt
+> die Einstellungen als Parameter statt aus dem Modulzustand — dadurch lassen
+> sich die Bau-Funktionen einzeln testen.
+>
+> **Geprüft:** 13 Tests in `tests/ui.test.js` mit dem Ortsnamen
+> `<img src=x onerror="window.__B1=1">Bad <b>Fett</b> &amp;amp; Co`. Der
+> Eintrag wird dafür wirklich ins Dokument gehängt — außerhalb des Dokuments
+> liefe `onerror` gar nicht erst los, der Test wäre wertlos. Nachgewiesen:
+> 0 `img`-Elemente, 0 `b`-Elemente, `window.__B1` bleibt `undefined`, der
+> Text kommt **zeichengenau** wieder heraus (auch das `&amp;amp;` bleibt eine
+> Zeichenfolge und wird nicht zu `&`) und im Markup steht `&lt;img`.
 
 **Wo:** `pointItemEl` (`:347-354`), `openPointSheet` (`:389-394`),
 `renderMap` → `bindPopup` (`:483`)
@@ -308,7 +334,36 @@ document.addEventListener('visibilitychange', () => {
 Zusätzlich `wakeLockSentinel.addEventListener('release', …)` protokollieren, damit
 im Fehlerfall nachvollziehbar ist, wann er verloren ging.
 
-### B4. Nominatim ohne Kennung — Sperre droht
+### B4. Nominatim ohne Kennung — Sperre droht — ✅ erledigt 05.08.2026
+
+> **Behoben,** alle drei Teile.
+>
+> - **Kennung:** Die Einstellungen haben ein Feld „Kontakt-E-Mail für
+>   Nominatim (freiwillig)". Ist es gefüllt, hängt `baueUrl` `&email=…`
+>   (URL-kodiert) an — genau der Weg, den Nominatim für Browser-Anwendungen
+>   vorsieht, da ein `User-Agent` nicht gesetzt werden kann. **Bewusst nicht
+>   vorbelegt:** die Adresse gehört dem Nutzer, und eine erfundene Kennung
+>   wäre schlimmer als gar keine. Leer bleibt der Parameter weg. Der Betrieb
+>   unter einer echten Domain (dann trägt der `Referer`) steht im README.
+> - **Drosselung:** unverändert eine Anfrage je 1,1 s, jetzt aber als
+>   benannte Konstante `MIN_ABSTAND_MS` und über eine hineingereichte
+>   Wartefunktion — dadurch testbar, ohne im Test Sekunden zu warten.
+> - **Abfuhr:** 429 **und** 403 (den schickt Nominatim bei dauerhaft
+>   auffälligen Anwendungen) legen die Warteschlange für 60 s still, und der
+>   Punkt wandert an den Anfang zurück statt verlorenzugehen.
+>
+> **Zusätzlich:** Bei einer Antwort ohne verwertbaren Namen wird `(unbekannt)`
+> zwar angezeigt, aber **nicht mehr in den Cache geschrieben**. Vorher hätte
+> ein einzelner Serverfehler `(unbekannt)` für dieses 110-m-Rasterfeld
+> dauerhaft festgeschrieben.
+>
+> **Geprüft:** 15 Tests in `tests/geocode.test.js` — mit hineingereichtem
+> `fetchFn`, hineingereichter Uhr und Wartefunktion, **ohne eine einzige
+> echte Anfrage** an Nominatim. Nachgewiesen unter anderem: zwei Punkte
+> ergeben nach 1 099 ms erst eine Anfrage und nach 1 100 ms zwei; nach einer
+> 429 bleibt der Ortsname leer, der Punkt liegt weiter in der Warteschlange,
+> und 59 s später ist noch immer nicht nachgelegt worden — nach Ablauf der
+> Sperre kommt genau derselbe Punkt erneut dran und bekommt seinen Namen.
 
 **Wo:** `pumpGeocodeQueue` (`:129-130`)
 

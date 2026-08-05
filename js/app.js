@@ -286,6 +286,15 @@ bindRange('carInt', 'carIntVal', 'carInt');
 bindRange('pauseMin', 'pauseMinVal', 'pauseMin');
 bindRange('useGeocode', null, 'useGeocode', true);
 
+/* Kontaktangabe fuer Nominatim (B4). Wird nicht vorbelegt – die Adresse gehoert
+   dem Nutzer, und eine erfundene Kennung waere schlimmer als gar keine. */
+const kontaktFeld = ui.$('#kontakt');
+kontaktFeld.value = settings.kontakt || '';
+kontaktFeld.addEventListener('change', () => {
+  settings.kontakt = kontaktFeld.value.trim();
+  speicher.saveSettings(settings);
+});
+
 // ---------- Sichern und Einlesen ----------
 ui.$('#btnSichern').addEventListener('click', () => {
   ui.starteDownload(

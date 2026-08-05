@@ -51,6 +51,26 @@ Uhrzeit und Ortschaft protokolliert – bis du sie aktiv stoppst.
   gecacht. In dicht bebautem Gebiet kann ein Cache-Eintrag deshalb zwei
   benachbarte Ortsteile abdecken.
 
+## Nominatim fair benutzen
+
+Nominatim ist ein Dienst der OpenStreetMap-Gemeinschaft und
+[hat Nutzungsbedingungen](https://operations.osmfoundation.org/policies/nominatim/):
+höchstens **eine Anfrage pro Sekunde** und eine **erreichbare Kennung** des
+Aufrufers. WegLog hält beides ein:
+
+- Die Warteschlange arbeitet mit 1,1 s Abstand, Antworten werden lokal gecacht,
+  und auf HTTP 429 oder 403 pausiert sie eine Minute, statt weiterzupumpen.
+- Ein Browser darf den `User-Agent` nicht setzen. Vorgesehen ist stattdessen
+  der Parameter `email`. In den Einstellungen gibt es dafür das Feld
+  **Kontakt-E-Mail für Nominatim** — freiwillig, nicht vorbelegt, bleibt auf
+  dem Gerät. Ohne Eintrag wird nichts mitgeschickt.
+- Wird WegLog unter einer echten Domain betrieben (z. B. GitHub Pages), trägt
+  zusätzlich der automatisch mitgeschickte `Referer` zur Identifizierung bei.
+  **Die Betriebsdomain hier eintragen:** _(noch nicht festgelegt)_
+
+Bei starker Nutzung ist `photon.komoot.io` eine Ausweichquelle; die Anbindung
+steckt vollständig in `js/geocode.js` (`baueUrl` und `ortAusAntwort`).
+
 ## Starten (lokal testen)
 ```bash
 python -m http.server 5179

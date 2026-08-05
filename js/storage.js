@@ -24,6 +24,7 @@ export const defaultSettings = {
   pauseMin: 3,  // Min Stillstand bis 'Pause'
   useGeocode: true,
   startHinweisWeg: false,   // Hinweis zur Hintergrund-Aufzeichnung ausgeblendet
+  kontakt: '',              // E-Mail-Kennung fuer Nominatim (B4), leer = keine
 };
 
 /* Der Speicher ist injizierbar, damit Tests gegen eine Attrappe laufen
