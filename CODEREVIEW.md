@@ -51,7 +51,35 @@ Es gibt keine Fehlerbehandlung und keinen Hinweis für den Nutzer.
    in einem separaten, größenbegrenzten Cache halten (Cache-First mit LRU, Deckel
    ~50 MB). Dann ist die Karte auf bekannten Strecken auch offline da.
 
-### A2. Kein Schutz gegen volles localStorage
+### A2. Kein Schutz gegen volles localStorage — ✅ erledigt 05.08.2026
+
+> **Behoben.** Jeder Schreibvorgang geht durch `persist(key, wert)` in
+> `js/storage.js`: `QuotaExceededError` wird gefangen (inklusive der
+> Firefox-Schreibweise `NS_ERROR_DOM_QUOTA_REACHED` und der Codes 22/1014),
+> der Aufrufer bekommt `false`, und der Nutzer sieht ein rotes Banner, das
+> **stehen bleibt**, bis er es loswird. Damit `storage.js` DOM-frei bleibt
+> (sonst wären die Tests darauf angewiesen), geht die Meldung über einen
+> Rückruf, den `app.js` auf `ui.zeigeBanner` setzt.
+>
+> - **Der gefährlichste Fall zuerst:** Schlägt beim Stoppen `saveHistory`
+>   fehl, wird `weglog.active` **nicht** gelöscht. Die Aufzeichnung überlebt
+>   damit einen Neustart, statt zwischen zwei Schlüsseln zu verschwinden, und
+>   das Banner fordert zum sofortigen Sichern auf (A3 macht das möglich).
+> - **Ortscache gedeckelt** auf 2 000 Einträge. Dafür hat jeder Eintrag jetzt
+>   einen Zeitstempel (`{ort, t}`); alte Einträge, die nur den Namen als
+>   Zeichenkette hielten, werden beim Laden umgesetzt und gelten als die
+>   ältesten. `deckleGeocache` verwirft von hinten, also die ältesten zuerst.
+> - **Einstellungen** zeigen einen Balken mit der Belegung (Zeichen, nicht
+>   Bytes — `localStorage` rechnet in UTF-16-Einheiten), die Zahl der
+>   Aufzeichnungen und Wegpunkte, und einen Knopf „Älter als 90 Tage
+>   löschen" mit Rückfrage und Hinweis aufs Sichern.
+>
+> **Geprüft:** 25 Tests in `tests/storage.test.js`, davon 5 zum vollen
+> Speicher. Die Attrappe kennt jetzt eine Größengrenze und wirft dieselbe
+> Ausnahme wie ein echter Browser. Nachgewiesen: `persist` wirft nicht,
+> sondern liefert `false`; die Meldung enthält „Speicher voll"; **der zuvor
+> gespeicherte Stand bleibt unverändert erhalten**, wenn das Schreiben
+> scheitert (ein halb geschriebener Verlauf wäre schlimmer als gar keiner).
 
 **Wo:** `saveHistory` (`:61`), `saveActive` (`:52-55`), `saveGeocache` (`:67`)
 

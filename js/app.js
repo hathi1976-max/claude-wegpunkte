@@ -12,6 +12,9 @@ import { erstelleGeocoder } from './geocode.js';
 import { alsSicherung, leseSicherung, vereine, zeitstempelName } from './export.js';
 import * as ui from './ui.js';
 
+// Fehler beim Speichern muessen sichtbar werden, sonst gehen Daten still verloren
+speicher.setzeMelder((text, art) => ui.zeigeBanner(text, art));
+
 let settings = speicher.loadSettings();
 let aufzeichnungen = speicher.loadHistory();
 let geocache = speicher.loadGeocache();
@@ -34,7 +37,11 @@ function holeZustand(){
 const geocoder = erstelleGeocoder({
   getSettings: () => settings,
   getCache: () => geocache,
-  setCacheEintrag: (key, wert) => { geocache[key] = wert; speicher.saveGeocache(geocache); },
+  setCacheEintrag: (key, wert) => {
+    geocache[key] = { ort: wert, t: Date.now() };
+    geocache = speicher.deckleGeocache(geocache);
+    speicher.saveGeocache(geocache);
+  },
   onPointUpdated: () => {
     speicher.saveActive(laufendeAufzeichnung);
     ui.renderLive();
@@ -54,8 +61,26 @@ ui.verbinde({
     speicher.saveHistory(aufzeichnungen);
     ui.renderHistory();
     ui.fillMapSessionOptions();
+    aktualisiereSpeicher();
   },
+  onEinstellungen: () => aktualisiereSpeicher(),
 });
+
+// ---------- Speicherbelegung ----------
+function aktualisiereSpeicher(){
+  const belegt = speicher.belegung();
+  const alle = laufendeAufzeichnung ? [laufendeAufzeichnung, ...aufzeichnungen] : aufzeichnungen;
+  ui.zeigeSpeicher({
+    zeichen: belegt.zeichen,
+    grenze: speicher.UEBLICHE_GRENZE,
+    aufzeichnungen: alle.length,
+    wegpunkte: alle.reduce((s, a) => s + (a.points ? a.points.length : 0), 0),
+  });
+}
+
+function anzahlWort(n){
+  return n === 1 ? 'eine Aufzeichnung' : n + ' Aufzeichnungen';
+}
 
 function sessionById(id){
   if (laufendeAufzeichnung && String(laufendeAufzeichnung.id) === String(id)) return laufendeAufzeichnung;
@@ -137,9 +162,17 @@ function stopTracking(){
     ruheZustand = { ...leerZustand(), lastRaw: laufendeAufzeichnung.zustand.lastRaw };
     delete laufendeAufzeichnung.zustand;   // Laufzeitzustand gehoert nicht in den Verlauf
     aufzeichnungen.unshift(laufendeAufzeichnung);
-    speicher.saveHistory(aufzeichnungen);
+    const gesichert = speicher.saveHistory(aufzeichnungen);
     laufendeAufzeichnung = null;
-    speicher.saveActive(null);
+    if (gesichert){
+      speicher.saveActive(null);
+    } else {
+      // Verlauf liess sich nicht schreiben: den Schluessel der laufenden
+      // Aufzeichnung stehen lassen, damit die Punkte einen Neustart ueberleben.
+      ui.zeigeBanner('Die Aufzeichnung ist beendet, konnte aber nicht gespeichert '
+        + 'werden. Bitte jetzt unter ⚙︎ sichern — sie liegt sonst nur noch im '
+        + 'Arbeitsspeicher.', 'error');
+    }
     detachWatcher();
     releaseWakeLock();
     ui.updateLiveState();
@@ -209,6 +242,23 @@ ui.$('#btnSichern').addEventListener('click', () => {
 
 ui.$('#btnEinlesen').addEventListener('click', () => ui.$('#dateiEinlesen').click());
 
+ui.$('#btnAltLoeschen').addEventListener('click', () => {
+  const { behalten, entfernt } = speicher.teileNachAlter(aufzeichnungen, 90);
+  if (entfernt.length === 0){
+    ui.zeigeBanner('Es gibt keine Aufzeichnung, die älter als 90 Tage ist.', 'ok', 6000);
+    return;
+  }
+  const frage = `${anzahlWort(entfernt.length)} älter als 90 Tage endgültig löschen?\n\n`
+    + 'Vorher „Alles sichern" zu drücken, lohnt sich — rückgängig geht das nicht.';
+  if (!window.confirm(frage)) return;
+  aufzeichnungen = behalten;
+  speicher.saveHistory(aufzeichnungen);
+  ui.renderHistory();
+  ui.fillMapSessionOptions();
+  aktualisiereSpeicher();
+  ui.zeigeBanner(`${anzahlWort(entfernt.length)} gelöscht.`, 'ok', 6000);
+});
+
 ui.$('#dateiEinlesen').addEventListener('change', async ev => {
   const datei = ev.target.files && ev.target.files[0];
   ev.target.value = '';   // damit dieselbe Datei erneut waehlbar bleibt
@@ -225,6 +275,7 @@ ui.$('#dateiEinlesen').addEventListener('change', async ev => {
     speicher.saveHistory(aufzeichnungen);
     ui.renderHistory();
     ui.fillMapSessionOptions();
+    aktualisiereSpeicher();
     const neu = aufzeichnungen.length - vorher;
     ui.zeigeBanner(
       `Sicherung eingelesen: ${neu} neu, ${eingelesen.length - neu} schon vorhanden.`,
@@ -246,6 +297,7 @@ function initApp(){
   ui.renderHistory();
   ui.fillMapSessionOptions();
   ui.updateLiveState();
+  aktualisiereSpeicher();
 
   if (laufendeAufzeichnung){
     // App wurde neu geladen, waehrend eine Aufzeichnung lief -> fortsetzen.

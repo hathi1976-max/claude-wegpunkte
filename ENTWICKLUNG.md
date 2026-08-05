@@ -174,3 +174,43 @@ Zwei Dinge, die die Vorlage im Review nicht vorsah, aber nötig sind:
 Dazu Rundlauf der Sicherung (Werte identisch, `zustand` nicht in der Datei),
 Ablehnung kaputter/fremder/leerer Dateien, Nachrechnen einer fehlenden
 Streckenlänge (111,195 km für einen Breitengrad) und vier Fälle für `vereine`.
+
+### 05.08.2026 — A2: Schutz gegen vollen Speicher
+
+**Geändert.** `js/storage.js` schreibt nur noch über `persist(key, wert)`.
+Die Funktion fängt `QuotaExceededError` (samt der Firefox-Schreibweise
+`NS_ERROR_DOM_QUOTA_REACHED` und den Codes 22 und 1014), liefert `false` und
+schickt eine Meldung an einen Rückruf. `app.js` verbindet diesen Rückruf mit
+`ui.zeigeBanner`; `storage.js` bleibt damit DOM-frei und testbar.
+
+Drei Stellen, an denen das Verhalten sich dadurch ändert:
+
+1. **Stoppen.** Schlägt `saveHistory` fehl, wird `weglog.active` **nicht**
+   gelöscht. Ohne das verschwände die Aufzeichnung zwischen zwei Schlüsseln:
+   aus dem aktiven entfernt, im Verlauf nie angekommen. Der Nutzer bekommt ein
+   Banner, das zum sofortigen Sichern auffordert.
+2. **Ortscache.** Er wächst über alle Fahrten hinweg und wurde nie kleiner.
+   Jetzt hat jeder Eintrag einen Zeitstempel (`{ort, t}`), und
+   `deckleGeocache` hält 2 000 Einträge, wobei die ältesten zuerst fliegen.
+   Alte Einträge, die nur den Ortsnamen als Zeichenkette hielten, werden beim
+   Laden umgesetzt (`t: 0`) und gelten damit als die ältesten — genau richtig.
+3. **Einstellungen.** Neuer Abschnitt „Speicher" mit Balken, Belegung in KB/MB
+   gegen die übliche 5-MB-Grenze, Zahl der Aufzeichnungen und Wegpunkte, dazu
+   „Älter als 90 Tage löschen" mit Rückfrage.
+
+Gerechnet wird in **Zeichen**, nicht in Bytes: `localStorage` bemisst seine
+Grenze in UTF-16-Einheiten, eine Byte-Zahl nach UTF-8 wäre die falsche Auskunft.
+
+**Geprüft.** 25 Tests in `tests/storage.test.js`, davon 5 zum vollen Speicher.
+Die Attrappe hat dafür eine Größengrenze bekommen und wirft dieselbe Ausnahme
+wie ein echter Browser. Nachgewiesen:
+
+- `persist` wirft nicht, sondern liefert `false`.
+- Die Meldung erreicht die Anzeige, mit Art `error` und dem Text „Speicher voll".
+- **Der zuvor gespeicherte Stand bleibt unverändert**, wenn das Schreiben
+  scheitert — ein halb geschriebener Verlauf wäre schlimmer als gar keiner.
+- Unterhalb der Grenze wird ganz normal geschrieben, ohne Meldung.
+- `deckleGeocache` verwirft aus 10 Einträgen die 7 ältesten und lässt einen
+  Cache unterhalb des Deckels unangetastet (identische Objektreferenz).
+- `teileNachAlter` trennt an der Tagesgrenze; exakt 90 Tage alt bleibt erhalten,
+  und ohne `endTime` zählt der Beginn.

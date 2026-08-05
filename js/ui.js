@@ -72,6 +72,22 @@ export function versteckeBanner(){
   $('#banner').hidden = true;
 }
 
+// ---------- Speicheranzeige ----------
+export function zeigeSpeicher({ zeichen, grenze, aufzeichnungen, wegpunkte }){
+  const anteil = Math.min(100, Math.round(zeichen / grenze * 100));
+  const fuellung = $('#speicherFuellung');
+  fuellung.style.width = anteil + '%';
+  $('#speicherBalken').classList.toggle('voll', anteil >= 80);
+  $('#speicherText').textContent =
+    `Belegt: ${kb(zeichen)} von etwa ${kb(grenze)} (übliche Browser-Grenze), ${anteil} % · `
+    + `${aufzeichnungen} Aufzeichnungen, ${wegpunkte} Wegpunkte`;
+}
+
+function kb(zeichen){
+  if (zeichen >= 1024 * 1024) return (zeichen / 1024 / 1024).toFixed(1).replace('.', ',') + ' MB';
+  return Math.round(zeichen / 1024) + ' KB';
+}
+
 // ---------- Statusanzeigen ----------
 export function setGpsPill(ok, acc){
   const pill = $('#gpsState');
@@ -267,4 +283,5 @@ export function setActiveTab(view){
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== 'view-' + view);
   if (view === 'map'){ fillMapSessionOptions(); renderMap(); }
   if (view === 'history') renderHistory();
+  if (view === 'settings' && ctx.onEinstellungen) ctx.onEinstellungen();
 }

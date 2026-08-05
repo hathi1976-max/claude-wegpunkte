@@ -25,8 +25,8 @@ export function erstelleGeocoder({ getSettings, getCache, setCacheEintrag, onPoi
     if (!getSettings().useGeocode) return;
     const key = geocodeKey(point.lat, point.lon);
     const treffer = getCache()[key];
-    if (treffer){
-      point.place = treffer;
+    if (treffer && treffer.ort){
+      point.place = treffer.ort;
       onPointUpdated();
       return;
     }

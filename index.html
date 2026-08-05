@@ -30,7 +30,7 @@
       Ortschaft aufzuzeichnen, solange du unterwegs bist.</p>
     <button id="btnEnable" class="btn btn-primary">Standort erlauben</button>
     <p id="permHint" class="hint"></p>
-    <p class="ver">Version v3</p>
+    <p class="ver">Version v4</p>
   </section>
 
   <main id="app" hidden>
@@ -108,6 +108,15 @@
         <input id="dateiEinlesen" type="file" accept="application/json,.json" hidden />
         <small class="muted">Eine Sicherung wird <b>ergänzt</b>, nicht ersetzt:
           vorhandene Aufzeichnungen bleiben unangetastet.</small>
+      </div>
+
+      <h3 class="abschnitt">Speicher</h3>
+      <div class="field">
+        <div id="speicherBalken" class="speicherbalken"><i id="speicherFuellung"></i></div>
+        <small id="speicherText" class="muted">–</small>
+        <div class="knopfreihe">
+          <button id="btnAltLoeschen" class="btn">🗑 Älter als 90 Tage löschen</button>
+        </div>
       </div>
 
       <p class="muted small">Karte &amp; Ortsnamen © OpenStreetMap-Mitwirkende.</p>
