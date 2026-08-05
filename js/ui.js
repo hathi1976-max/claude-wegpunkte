@@ -243,15 +243,45 @@ export function fillMapSessionOptions(){
   if (sel.querySelector(`option[value="${prev}"]`)) sel.value = prev;
 }
 
+/* Der Hinweis unter der Karte. Nie innerHTML – hier landen auch Texte, die
+   von Kachel- und Netzfehlern kommen. */
+export function setzeKartenHinweis(text){
+  const el = $('#mapHinweis');
+  el.textContent = text || '';
+  el.hidden = !text;
+}
+
 export function renderMap(){
   const sel = $('#mapSession');
   if (!sel.value) fillMapSessionOptions();
   const session = ctx.sessionById(sel.value);
+
+  // Ohne Leaflet gibt es keine Karte – aber es darf auch nichts abstuerzen.
+  // Der Reiter muss weiter benutzbar bleiben, die Aufzeichnung laeuft ohnehin.
+  if (typeof L === 'undefined'){
+    $('#mapContainer').hidden = true;
+    setzeKartenHinweis('Die Kartenbibliothek ist nicht geladen. Einmal mit '
+      + 'Internetverbindung neu laden, dann liegt sie im Offline-Speicher. '
+      + 'Der aufgezeichnete Weg bleibt davon unberührt.');
+    return;
+  }
+  $('#mapContainer').hidden = false;
+
   if (!currentMap){
     currentMap = L.map('mapContainer');
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const kacheln = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OpenStreetMap-Mitwirkende', maxZoom: 19,
-    }).addTo(currentMap);
+      // CORS statt undurchsichtiger Antworten: nur so kann der Service Worker
+      // erkennen, ob eine Kachel wirklich angekommen ist
+      crossOrigin: true,
+    });
+    kacheln.on('tileerror', () => setzeKartenHinweis(
+      'Offline – Kartenkacheln fehlen. Der aufgezeichnete Weg bleibt trotzdem '
+      + 'gespeichert und wird angezeigt, sobald die Karte wieder lädt.'));
+    // 'load' feuert erst, wenn alle sichtbaren Kacheln da sind – 'tileload'
+    // je Kachel wuerde den Hinweis bei halb geladener Karte wegblinken lassen
+    kacheln.on('load', () => setzeKartenHinweis(''));
+    kacheln.addTo(currentMap);
   }
   if (currentMapLayer){ currentMap.removeLayer(currentMapLayer); currentMapLayer = null; }
   setTimeout(() => currentMap.invalidateSize(), 50);

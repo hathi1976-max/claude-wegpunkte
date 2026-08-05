@@ -92,6 +92,8 @@ body{
   padding:10px; border-radius:10px; font-size:15px; width:100%; margin-bottom:10px;
 }
 #mapContainer{height:calc(100vh - 210px); border-radius:12px; overflow:hidden}
+.hinweis{margin:10px 0 0; padding:10px 12px; border-radius:10px; font-size:13px;
+  background:rgba(240,136,62,.14); color:#f7c08a}
 .leaflet-container{background:var(--bg2)}
 
 /* Settings */

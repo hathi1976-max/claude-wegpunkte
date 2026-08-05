@@ -34,6 +34,16 @@ Uhrzeit und Ortschaft protokolliert – bis du sie aktiv stoppst.
   halten" (Wake Lock) hilft, solange die App im Vordergrund/Bildschirm an ist,
   ersetzt aber kein natives Hintergrund-Tracking.
 - Alle Daten liegen nur **lokal im Browser** (`localStorage`), kein Cloud-Sync.
+  Der Speicher ist je nach Browser bei etwa 5 MB gedeckelt; die Einstellungen
+  zeigen die Belegung an und melden es deutlich, wenn nichts mehr hineinpasst.
+- **Offline-Karte:** Leaflet und die schon einmal betrachteten Kartenkacheln
+  liegen im Offline-Speicher (Deckel 600 Kacheln). Der erste Aufruf muss
+  online geschehen; danach ist die Karte auf bekannten Strecken auch im
+  Funkloch da. Fehlen Kacheln, sagt die App es — die Aufzeichnung selbst
+  läuft davon unabhängig weiter.
+- **Ortsnamen** werden auf ein Raster von drei Nachkommastellen (~110 m)
+  gecacht. In dicht bebautem Gebiet kann ein Cache-Eintrag deshalb zwei
+  benachbarte Ortsteile abdecken.
 
 ## Starten (lokal testen)
 ```bash

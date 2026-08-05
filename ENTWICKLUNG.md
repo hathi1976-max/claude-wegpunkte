@@ -214,3 +214,47 @@ wie ein echter Browser. Nachgewiesen:
   Cache unterhalb des Deckels unangetastet (identische Objektreferenz).
 - `teileNachAlter` trennt an der Tagesgrenze; exakt 90 Tage alt bleibt erhalten,
   und ohne `endTime` zählt der Beginn.
+
+### 05.08.2026 — A1: Offline-Karte
+
+**Geändert.** `sw.js` neu aufgebaut: drei Caches statt einem.
+
+| Cache | Inhalt | Strategie |
+| --- | --- | --- |
+| `weglog-v5` | eigene Dateien | Netz zuerst, Cache als Rückfall |
+| `weglog-vendor-leaflet-1.9.4` | Leaflet CSS + JS | Cache zuerst, beim Install geholt |
+| `weglog-kacheln-v1` | OSM-Kacheln | Cache zuerst, Deckel 600 |
+
+Die Zeile, die `unpkg.com` und `tile.` ausdrücklich vom Cache ausschloss, ist
+weg; Nominatim bleibt ungecacht, weil Ortsnamen Live-Abfragen sind.
+
+In `ui.js`: `renderMap` prüft `typeof L === 'undefined'`, blendet den
+Kartenbereich aus und zeigt einen Hinweis, statt einen `ReferenceError` zu
+werfen. Der Kachel-Layer bekommt `crossOrigin: true` und zwei Ereignisse:
+`tileerror` setzt den Hinweis, `load` (alle sichtbaren Kacheln da) nimmt ihn
+wieder weg. `tileload` je Kachel wäre falsch — der Hinweis blinkte bei halb
+geladener Karte weg.
+
+**Zwei bewusste Abweichungen vom Review** (Begründung in `CODEREVIEW.md`):
+
+1. Leaflet liegt **nicht** als Datei im Projekt, sondern wird beim Install in
+   den `VENDOR`-Cache geholt. Für den Nutzer ist das Ergebnis dasselbe; die
+   allererste Installation muss online geschehen.
+2. Der Kachelcache verwirft nach **FIFO**, nicht nach LRU. Die Cache-API
+   liefert `keys()` in Einfügereihenfolge; echtes LRU bräuchte einen Index
+   oder ein Neuschreiben jeder getroffenen Kachel.
+
+**Geprüft.** Neu: `tests/version.test.js` (6 Tests), die die ausgelieferten
+Dateien selbst lesen — gleiche Herkunft, kein fremder Dienst.
+
+- **Der wichtigste Test** läuft die Import-Kette ab `js/app.js` ab und
+  verlangt, dass jedes erreichte Modul in `SHELL` steht. Genau dieser Fehler
+  — ein neues Modul vergessen — zerlegt die App offline, ohne dass es online
+  auffiele. Aktuell: 8 Module gefunden, alle in `SHELL`.
+- Jeder `SHELL`-Eintrag ist wirklich abrufbar (HTTP 200).
+- `sw.js` und `index.html` verweisen auf dieselben zwei Leaflet-Dateien,
+  beide auf eine feste Version gepinnt und mit `crossorigin`.
+- Cache-Name in `sw.js` und Versionsanzeige in `index.html` stimmen überein.
+
+Alle Regeln dieser Tests sind vorher mit einem Python-Skript gegen die echten
+Dateien nachvollzogen worden, damit die Ausdrücke nicht ins Leere greifen.

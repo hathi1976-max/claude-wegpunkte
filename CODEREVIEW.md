@@ -15,7 +15,57 @@ Aufzeichnen unterwegs, offline und über längere Zeit.
 
 ## A. Kritisch
 
-### A1. Die Karte funktioniert offline nicht — obwohl das der Anwendungsfall ist
+### A1. Die Karte funktioniert offline nicht — obwohl das der Anwendungsfall ist — ✅ erledigt 05.08.2026
+
+> **Behoben, Punkt 1 aber anders gelöst als vorgeschlagen.**
+>
+> Der Service Worker hat jetzt **drei Caches mit drei Strategien**: `CACHE`
+> (eigene Dateien, Netz zuerst), `VENDOR` (Leaflet, Cache zuerst) und
+> `KACHELN` (OSM-Kacheln, Cache zuerst mit Deckel). Die Zeile, die
+> `unpkg.com` und `tile.` **ausdrücklich vom Cache ausschloss**, ist weg;
+> übrig bleibt Nominatim, das zu Recht nie gecacht wird.
+>
+> - **Punkt 2 (defensives `renderMap`) umgesetzt:** Ist `L` nicht definiert,
+>   wird der Kartenbereich ausgeblendet und ein Hinweis gezeigt, statt einen
+>   `ReferenceError` zu werfen, der `setActiveTab` abbricht. Der Hinweis geht
+>   über `textContent`, nicht `innerHTML` (siehe B1).
+> - **Punkt 3 (Kachelfehler) umgesetzt,** mit dem wichtigen zweiten Halbsatz:
+>   „Der aufgezeichnete Weg bleibt trotzdem gespeichert." Aufgehoben wird der
+>   Hinweis am Leaflet-Ereignis `load` (alle sichtbaren Kacheln da), nicht an
+>   `tileload` je Kachel — sonst blinkt er bei halb geladener Karte weg.
+> - **Punkt 4 (Kachelcache) umgesetzt,** Deckel 600 Kacheln (grob 10–25 MB).
+>   Der Kachel-Layer bekommt `crossOrigin: true`, sonst sind die Antworten
+>   undurchsichtig, der Service Worker kann nicht erkennen, ob eine Kachel
+>   wirklich ankam, und der Browser rechnet sie mit einem Aufschlag gegen das
+>   Speicherkontingent.
+>
+> **Abweichung 1 — Leaflet bleibt beim CDN, wird aber mitinstalliert.**
+> Die Vorlage wollte Leaflet als Datei ins Projekt legen. Dafür müsste diese
+> Fassung eine fremde Datei aus dem Netz laden und ins Repository schreiben —
+> das ist hier nicht passiert. Stattdessen holt der Service Worker die beiden
+> gepinnten Leaflet-URLs beim **Install** in den `VENDOR`-Cache und liefert
+> sie danach Cache-zuerst aus. Für den Nutzer ist das Ergebnis dasselbe: nach
+> dem ersten Aufruf mit Internet ist die Karte offline vollständig. Der
+> Unterschied bleibt, dass die allererste Installation online geschehen muss
+> und die Abhängigkeit von unpkg formal bestehen bleibt. Wer sie loswerden
+> will, legt die beiden Dateien nach `vendor/`, ändert die zwei Verweise in
+> `index.html` und verschiebt sie aus `VENDOR_URLS` in `SHELL` —
+> `tests/version.test.js` merkt sofort, wenn dabei etwas auseinanderläuft.
+>
+> **Abweichung 2 — FIFO statt LRU beim Kachelcache.** Echtes LRU hieße, jede
+> getroffene Kachel neu zu schreiben oder einen Index nebenherzuführen. Die
+> Cache-API liefert `keys()` ohnehin in Einfügereihenfolge, und für den Zweck
+> — dieselbe Strecke mehrfach fahren — verwerfen FIFO und LRU praktisch
+> dieselben Kacheln. Aufgeräumt wird nur alle 25 Kacheln, weil jede Prüfung
+> ein `keys()` über den ganzen Cache kostet.
+>
+> **Geprüft:** 6 neue Tests in `tests/version.test.js`, die die Auslieferung
+> selbst lesen. Der wichtigste läuft die Import-Kette ab `js/app.js` ab und
+> verlangt, dass **jedes** erreichte Modul in `SHELL` steht — genau der
+> Fehler, der die App offline zerlegt. Er findet aktuell 8 Module, alle in
+> `SHELL`. Dazu: jeder `SHELL`-Eintrag ist abrufbar, `sw.js` und
+> `index.html` verweisen auf **dieselben** zwei Leaflet-Dateien, die
+> Versionen sind gepinnt, und `crossorigin` ist gesetzt.
 
 **Wo:** `index.html:12` und `:119` laden Leaflet von `unpkg.com`; `sw.js:33`
 schließt `unpkg.com` und `tile.` **ausdrücklich vom Cache aus**.
