@@ -6,6 +6,7 @@
 import { sessionDistanceKm } from './geo.js';
 import {
   neuerZustand, leerZustand, zustandAusAufzeichnung, baueWegpunkt, schrittPosition,
+  istLuecke,
 } from './tracking.js';
 import * as speicher from './storage.js';
 import { erstelleGeocoder } from './geocode.js';
@@ -28,6 +29,8 @@ if (laufendeAufzeichnung) laufendeAufzeichnung.zustand = zustandAusAufzeichnung(
 let ruheZustand = leerZustand();
 let watchId = null;
 let wakeLockSentinel = null;
+// Nach dem Zurueckschalten in den Vordergrund einmal auf eine Zeitluecke pruefen
+let lueckePruefen = false;
 
 function holeZustand(){
   return laufendeAufzeichnung ? laufendeAufzeichnung.zustand : ruheZustand;
@@ -43,7 +46,12 @@ const geocoder = erstelleGeocoder({
     speicher.saveGeocache(geocache);
   },
   onPointUpdated: () => {
-    speicher.saveActive(laufendeAufzeichnung);
+    // Ortsnamen treffen mit ~1,1 s Abstand ein und koennen die Aufzeichnung
+    // ueberdauern. Danach haengt der Punkt im Verlauf, nicht mehr an der
+    // laufenden Aufzeichnung – dann muss der Verlauf geschrieben werden,
+    // sonst ist der Name nach dem naechsten Neuladen wieder weg (B2).
+    if (laufendeAufzeichnung) speicher.saveActive(laufendeAufzeichnung);
+    else speicher.saveHistory(aufzeichnungen);
     ui.renderLive();
     if (ui.kartenAnsichtOffen()) ui.renderMap();
   },
@@ -104,6 +112,22 @@ function handlePosition(pos){
   if (!laufendeAufzeichnung){
     ruheZustand = { ...ruheZustand, lastRaw: raw };
     return;
+  }
+
+  // Erst pruefen, ob das Betriebssystem die Standortabfrage im Hintergrund
+  // gedrosselt hat. Ohne Markierung zoege die Karte eine gerade Linie durch
+  // die Landschaft, als waere man sie so gefahren (B5).
+  if (lueckePruefen){
+    lueckePruefen = false;
+    const letzte = laufendeAufzeichnung.zustand.lastRaw;
+    if (istLuecke(letzte ? letzte.t : null, now, settings)){
+      nimmWegpunktAuf(baueWegpunkt('luecke', coords, 0, now));
+      // Die Luecke ist der Wegpunkt dieses Moments; und was waehrend der
+      // Drosselung passierte, wissen wir nicht – also auch keine Pause behaupten.
+      laufendeAufzeichnung.zustand = {
+        ...laufendeAufzeichnung.zustand, lastLogTime: now, pauseSince: null,
+      };
+    }
   }
 
   const vorher = laufendeAufzeichnung.zustand;
@@ -202,12 +226,43 @@ function detachWatcher(){
 }
 
 async function requestWakeLock(){
-  try { wakeLockSentinel = await navigator.wakeLock.request('screen'); }
-  catch { wakeLockSentinel = null; }
+  if (!navigator.wakeLock) return;
+  try {
+    wakeLockSentinel = await navigator.wakeLock.request('screen');
+    // Protokollieren, wann er verloren ging – sonst ist im Fehlerfall nicht
+    // nachvollziehbar, warum der Bildschirm ausging.
+    wakeLockSentinel.addEventListener('release', () => {
+      console.info('Wake Lock freigegeben', new Date().toISOString());
+    });
+  } catch (e){
+    wakeLockSentinel = null;
+    console.warn('Wake Lock nicht erhalten', e);
+  }
 }
+
 function releaseWakeLock(){
   if (wakeLockSentinel){ wakeLockSentinel.release().catch(() => {}); wakeLockSentinel = null; }
 }
+
+function wakeLockFehlt(){
+  return !wakeLockSentinel || wakeLockSentinel.released;
+}
+
+/* Das Betriebssystem gibt einen Screen Wake Lock frei, sobald das Dokument in
+   den Hintergrund geht – und holt ihn nicht von selbst zurueck (B3). */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!laufendeAufzeichnung) return;
+  lueckePruefen = true;
+  if (ui.$('#wakeLock').checked && wakeLockFehlt()) requestWakeLock();
+});
+
+/* Der Haken soll auch mitten in der Fahrt wirken, nicht erst beim naechsten Start. */
+ui.$('#wakeLock').addEventListener('change', () => {
+  if (!laufendeAufzeichnung) return;
+  if (ui.$('#wakeLock').checked) requestWakeLock();
+  else releaseWakeLock();
+});
 
 // ---------- Einstellungen ----------
 function bindRange(id, valId, key, isBool){
@@ -283,6 +338,14 @@ ui.$('#dateiEinlesen').addEventListener('change', async ev => {
   } catch (e){
     ui.zeigeBanner('Sicherung nicht lesbar: ' + e.message, 'error', 12000);
   }
+});
+
+// ---------- Hinweis zur Hintergrund-Aufzeichnung (B5) ----------
+if (settings.startHinweisWeg) ui.$('#hintergrundHinweis').hidden = true;
+ui.$('#hinweisWeg').addEventListener('click', () => {
+  settings.startHinweisWeg = true;
+  speicher.saveSettings(settings);
+  ui.$('#hintergrundHinweis').hidden = true;
 });
 
 // ---------- Start / Stopp ----------

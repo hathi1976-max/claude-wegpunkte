@@ -245,7 +245,18 @@ bereits eine, die übernommen werden kann — und auf alle Fremdwerte anwenden.
 Besser noch: bei den Sheets `textContent` statt `innerHTML` verwenden, dann
 erübrigt sich die Frage.
 
-### B2. Geocode-Rückläufer nach Sitzungsende
+### B2. Geocode-Rückläufer nach Sitzungsende — ✅ erledigt 05.08.2026
+
+> **Behoben** wie vorgeschlagen: `onPointUpdated` unterscheidet jetzt, wo der
+> Punkt inzwischen liegt — läuft noch eine Aufzeichnung, wird `saveActive`
+> geschrieben, sonst `saveHistory`. Damit überleben Ortsnamen, die nach dem
+> Stopp eintreffen, das nächste Neuladen. Nebeneffekt: der ungewollte
+> `removeItem`-Aufruf auf `weglog.active` bei `active === null` entfällt.
+>
+> **Nicht automatisch geprüft.** Der Rückläufer hängt an `app.js` und damit an
+> DOM und Netz; ein Test dafür müsste beides nachbauen. Der Fall steht
+> stattdessen als Klickpfad in der Prüfliste (Aufzeichnung starten, sofort
+> stoppen, ~2 s warten, neu laden — der Ortsname muss noch da sein).
 
 **Wo:** `pumpGeocodeQueue` (`:125-148`) → `onPointUpdated` (`:150-154`)
 
@@ -266,7 +277,18 @@ function onPointUpdated(){
 }
 ```
 
-### B3. Wake Lock wird beim Wegschalten nicht zurückgeholt
+### B3. Wake Lock wird beim Wegschalten nicht zurückgeholt — ✅ erledigt 05.08.2026
+
+> **Behoben** wie vorgeschlagen, mit drei Ergänzungen:
+> - Geprüft wird `!wakeLockSentinel || wakeLockSentinel.released`. Nur auf
+>   `null` zu prüfen reichte nicht: nach der Freigabe durch das Betriebssystem
+>   ist die Referenz weiterhin da, nur eben `released`.
+> - `wakeLockSentinel.addEventListener('release', …)` protokolliert mit
+>   Zeitstempel, wann er verloren ging — sonst ist im Fehlerfall nicht
+>   nachvollziehbar, warum der Bildschirm ausging.
+> - Der Haken wirkt jetzt **sofort**, nicht erst beim nächsten Start: ein
+>   `change`-Ereignis fordert den Lock an oder gibt ihn frei. Vorher wurde er
+>   nur einmal beim Start gelesen.
 
 **Wo:** `requestWakeLock` (`:280-283`)
 
@@ -308,7 +330,28 @@ HTTP 429 abfangen und die Warteschlange dann pausieren statt weiterzupumpen:
 })
 ```
 
-### B5. Hintergrund-Aufzeichnung ist technisch nicht garantiert
+### B5. Hintergrund-Aufzeichnung ist technisch nicht garantiert — ✅ erledigt 05.08.2026
+
+> **Behoben,** beide Teile.
+>
+> **Erwartung klargestellt:** Der Hinweis steht wörtlich unter dem
+> Start-Knopf (einmal wegklickbar, die Entscheidung wird in den Einstellungen
+> gemerkt) und im README. Der Kommentar im Kopf von `app.js`, der „Läuft bis
+> zum aktiven Stopp weiter" versprach, ist beim Modul-Umbau entfallen.
+>
+> **Lücken sichtbar gemacht:** Kommt die App aus dem Hintergrund zurück, wird
+> die nächste Position gegen `istLuecke()` geprüft. Schwelle ist das
+> Dreifache des größten eingestellten Intervalls, mindestens zehn Minuten —
+> mit den Vorgaben also 15 Minuten. Liegt eine Lücke vor, fällt ein Wegpunkt
+> vom neuen Typ `luecke` (⚠️, violett auf der Karte, violetter Balken in der
+> Liste). Danach werden `lastLogTime` auf jetzt und `pauseSince` auf `null`
+> gesetzt: die Lücke **ist** der Wegpunkt dieses Moments, und was während der
+> Drosselung geschah, weiß niemand — eine Pause zu behaupten wäre erfunden.
+>
+> **Geprüft:** 6 Tests zu `istLuecke` und `lueckenSchwelleMs`, darunter der
+> Grat (genau an der Schwelle ist es eine Lücke, eine Millisekunde davor
+> nicht) und der Fall `letzteZeit === 0` — die 0 ist falsy, darf aber nicht
+> wie „keine Position vorhanden" behandelt werden.
 
 **Wo:** konzeptionell — `attachWatcher` (`:270-275`), Anspruch in
 `app.js:2-4` ("Läuft bis zum aktiven Stopp weiter")

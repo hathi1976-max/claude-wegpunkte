@@ -38,6 +38,23 @@ export function zustandAusAufzeichnung(aufzeichnung){
   };
 }
 
+/* Ab wann eine Zeitspanne ohne Position als Luecke gilt (B5).
+
+   Mobile Browser drosseln watchPosition, sobald der Tab in den Hintergrund
+   geht. Dann fehlen Positionen, und die Karte zoege eine gerade Linie durch
+   die Landschaft, als waere man sie so gefahren. Die Schwelle liegt beim
+   Dreifachen des groessten eingestellten Intervalls, mindestens aber zehn
+   Minuten – darunter ist eine Pause im Empfang normal. */
+export function lueckenSchwelleMs(settings){
+  const groesstes = Math.max(settings.walkInt, settings.bikeInt, settings.carInt) * 60000;
+  return Math.max(10 * 60000, 3 * groesstes);
+}
+
+export function istLuecke(letzteZeit, now, settings){
+  if (typeof letzteZeit !== 'number') return false;
+  return (now - letzteZeit) >= lueckenSchwelleMs(settings);
+}
+
 export function baueWegpunkt(type, coords, speedKmh, now){
   return {
     t: now,

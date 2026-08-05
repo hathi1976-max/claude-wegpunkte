@@ -1,11 +1,14 @@
 /* Anzeige-Formatierung und Escaping. */
 
 export function typeIcon(type){
-  return { start: '🏁', resume: '▶️', pause: '⏸️', stop: '🏁', log: '📍' }[type] || '📍';
+  return { start: '🏁', resume: '▶️', pause: '⏸️', stop: '🏁', log: '📍', luecke: '⚠️' }[type] || '📍';
 }
 
 export function typeLabel(type){
-  return { start: 'Start', resume: 'Weiter', pause: 'Pause', stop: 'Ende', log: 'Wegpunkt' }[type] || 'Wegpunkt';
+  return {
+    start: 'Start', resume: 'Weiter', pause: 'Pause', stop: 'Ende',
+    log: 'Wegpunkt', luecke: 'Lücke',
+  }[type] || 'Wegpunkt';
 }
 
 export function fmtTime(t){

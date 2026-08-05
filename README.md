@@ -28,11 +28,17 @@ Uhrzeit und Ortschaft protokolliert – bis du sie aktiv stoppst.
   Aufzeichnungen bleiben, wie sie sind, nichts wird überschrieben.
 
 ## Grenzen (wichtig für den echten Einsatz)
-- Ein **Browser-Tab im Hintergrund** (Bildschirm aus, App gewechselt) wird
-  von iOS/Android irgendwann pausiert oder beendet – eine PWA kann GPS nicht
-  zuverlässig unbegrenzt im Hintergrund tracken. Die Option „Bildschirm wach
-  halten" (Wake Lock) hilft, solange die App im Vordergrund/Bildschirm an ist,
-  ersetzt aber kein natives Hintergrund-Tracking.
+- Die Aufzeichnung läuft zuverlässig, solange WegLog im **Vordergrund** und
+  der Bildschirm an ist. Ein **Browser-Tab im Hintergrund** (Bildschirm aus,
+  App gewechselt) wird von iOS/Android irgendwann gedrosselt oder beendet –
+  eine PWA kann GPS nicht zuverlässig unbegrenzt im Hintergrund verfolgen.
+  Die Option „Bildschirm wach halten" (Wake Lock) hilft, solange die App im
+  Vordergrund ist, ersetzt aber kein natives Hintergrund-Tracking. Der Lock
+  wird beim Zurückkommen aus dem Hintergrund automatisch neu angefordert.
+- Fehlen dadurch Wegpunkte, wird die Zeitspanne beim Zurückkommen als eigener
+  Wegpunkt **„Lücke" (⚠️)** protokolliert – statt eine gerade Linie durch die
+  Landschaft zu ziehen, als wäre man sie so gefahren. Schwelle: das Dreifache
+  des größten eingestellten Intervalls, mindestens zehn Minuten.
 - Alle Daten liegen nur **lokal im Browser** (`localStorage`), kein Cloud-Sync.
   Der Speicher ist je nach Browser bei etwa 5 MB gedeckelt; die Einstellungen
   zeigen die Belegung an und melden es deutlich, wenn nichts mehr hineinpasst.

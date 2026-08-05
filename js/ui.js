@@ -294,7 +294,10 @@ export function renderMap(){
   const latlngs = session.points.map(p => [p.lat, p.lon]);
   L.polyline(latlngs, { color: '#4aa8ff', weight: 4 }).addTo(group);
   session.points.forEach(p => {
-    const color = { start: '#3fb950', stop: '#f85149', pause: '#f0883e', resume: '#3fb950' }[p.type] || '#4aa8ff';
+    const color = {
+      start: '#3fb950', stop: '#f85149', pause: '#f0883e',
+      resume: '#3fb950', luecke: '#a371f7',
+    }[p.type] || '#4aa8ff';
     const marker = L.circleMarker([p.lat, p.lon], { radius: 6, color, fillColor: color, fillOpacity: 0.9 });
     marker.bindPopup(`<b>${typeLabel(p.type)}</b><br>${fmtTime(p.t)}`
       + `${p.place ? ' · ' + p.place : ''}<br>${p.speedKmh.toFixed(1)} km/h`);

@@ -23,6 +23,7 @@ export const defaultSettings = {
   carInt: 1,    // Min, > bikeMax
   pauseMin: 3,  // Min Stillstand bis 'Pause'
   useGeocode: true,
+  startHinweisWeg: false,   // Hinweis zur Hintergrund-Aufzeichnung ausgeblendet
 };
 
 /* Der Speicher ist injizierbar, damit Tests gegen eine Attrappe laufen

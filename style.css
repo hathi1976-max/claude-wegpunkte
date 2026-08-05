@@ -84,6 +84,7 @@ body{
 .item.pause{border-left:3px solid var(--warn)}
 .item.start,.item.resume{border-left:3px solid var(--accent2)}
 .item.stop{border-left:3px solid var(--danger)}
+.item.luecke{border-left:3px solid #a371f7}
 .all-list{display:flex; flex-direction:column}
 
 /* Karte */
@@ -117,3 +118,7 @@ body{
 .sheet-meta .k{color:var(--muted)}
 .sheet-actions{display:flex; gap:10px; flex-wrap:wrap}
 .sheet-actions .btn{flex:1 1 auto; min-width:30%}
+
+/* Hinweis unter dem Start-Knopf (B5) */
+.hinweis-weg{float:right; margin:-4px -4px 0 8px; background:none; border:none;
+  color:inherit; opacity:.7; font-size:14px; cursor:pointer; padding:2px 4px}

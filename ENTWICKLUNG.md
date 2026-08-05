@@ -258,3 +258,43 @@ Dateien selbst lesen — gleiche Herkunft, kein fremder Dienst.
 
 Alle Regeln dieser Tests sind vorher mit einem Python-Skript gegen die echten
 Dateien nachvollzogen worden, damit die Ausdrücke nicht ins Leere greifen.
+
+### 05.08.2026 — B3, B2, B5: Wake Lock, Geocode-Rückläufer, Zeitlücken
+
+**B3 — Wake Lock.** `visibilitychange` fordert den Lock beim Zurückkommen neu
+an. Zwei Dinge, die die Vorlage im Review so nicht hatte:
+
+- Geprüft wird `!wakeLockSentinel || wakeLockSentinel.released`. Nur auf `null`
+  zu prüfen genügt nicht — nach der Freigabe durch das Betriebssystem ist die
+  Referenz weiterhin gesetzt, nur eben `released`. Ohne diese Prüfung wäre die
+  Nachforderung wirkungslos gewesen.
+- Der Haken wirkt jetzt sofort statt erst beim nächsten Start (`change`-
+  Ereignis). Zusätzlich protokolliert ein `release`-Listener mit Zeitstempel,
+  wann der Lock verloren ging.
+
+**B2 — Geocode-Rückläufer.** `onPointUpdated` schreibt `saveActive`, solange
+eine Aufzeichnung läuft, sonst `saveHistory`. Ortsnamen, die nach dem Stopp
+eintreffen (die Warteschlange arbeitet mit ~1,1 s Abstand), überleben damit das
+nächste Neuladen. Nebenbei entfällt der ungewollte `removeItem`-Aufruf auf
+`weglog.active`.
+
+**B5 — Zeitlücken.** Neu in `tracking.js`: `lueckenSchwelleMs(settings)` und
+`istLuecke(letzteZeit, now, settings)`. Schwelle ist das Dreifache des größten
+eingestellten Intervalls, mindestens zehn Minuten — mit den Vorgaben 15 Minuten.
+Kommt die App aus dem Hintergrund, wird die nächste Position dagegen geprüft;
+liegt eine Lücke vor, fällt ein Wegpunkt vom neuen Typ `luecke` (⚠️, violett).
+Danach werden `lastLogTime` auf jetzt und `pauseSince` auf `null` gesetzt: die
+Lücke ist der Wegpunkt dieses Moments, und was während der Drosselung geschah,
+weiß niemand — eine Pause zu behaupten wäre erfunden.
+
+Dazu der Erwartungs-Hinweis wörtlich unter dem Start-Knopf (einmal wegklickbar,
+gemerkt in den Einstellungen) und im README.
+
+**Geprüft.** 6 Tests zu `istLuecke`/`lueckenSchwelleMs`: die drei Schwellen-
+Formeln, der Grat (genau an der Schwelle ist es eine Lücke, eine Millisekunde
+davor nicht) und `letzteZeit === 0` — die 0 ist falsy, darf aber nicht wie
+„keine Position vorhanden" behandelt werden. Genau diese Verwechslung hätte den
+ersten Wegpunkt einer Aufzeichnung mit Zeitbasis 0 fälschlich durchgelassen.
+
+B2 und B3 hängen an DOM, Netz und Betriebssystem und sind nicht automatisch
+geprüft; sie stehen als Klickpfade in der Prüfliste am Ende dieser Datei.

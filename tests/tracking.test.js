@@ -1,5 +1,7 @@
 import { gruppe, test, gleich, tiefGleich, wahr } from './lauf.js';
-import { schrittPosition, zustandAusAufzeichnung, leerZustand } from '../js/tracking.js';
+import {
+  schrittPosition, zustandAusAufzeichnung, leerZustand, istLuecke, lueckenSchwelleMs,
+} from '../js/tracking.js';
 import { erstelleAltenTracker } from './referenz-alt.js';
 
 const einstellungen = { walkInt: 5, bikeInt: 2, carInt: 1, pauseMin: 3, useGeocode: false };
@@ -144,6 +146,38 @@ gruppe('zustandAusAufzeichnung', () => {
     const z = zustandAusAufzeichnung({ id: 1, startTime: 0, points: [], zustand: { zustand: 'moving' } });
     gleich(z.pauseSince, null);
     gleich(z.lastRaw, null);
+  });
+});
+
+// ---------- Zeitluecken im Hintergrund (B5) ----------
+gruppe('Lueckenerkennung', () => {
+  test('Schwelle ist das Dreifache des groessten Intervalls', () => {
+    // groesstes Intervall 15 Min -> 45 Min
+    gleich(lueckenSchwelleMs({ walkInt: 15, bikeInt: 2, carInt: 1 }), 45 * 60000);
+    gleich(lueckenSchwelleMs({ walkInt: 1, bikeInt: 1, carInt: 10 }), 30 * 60000);
+  });
+
+  test('mindestens zehn Minuten, egal wie klein die Intervalle sind', () => {
+    gleich(lueckenSchwelleMs({ walkInt: 1, bikeInt: 1, carInt: 1 }), 10 * 60000);
+  });
+
+  test('Vorgabe-Einstellungen ergeben 15 Minuten', () => {
+    gleich(lueckenSchwelleMs(einstellungen), 15 * 60000);
+  });
+
+  test('genau an der Schwelle gilt es als Luecke', () => {
+    gleich(istLuecke(0, 15 * 60000, einstellungen), true);
+    gleich(istLuecke(0, 15 * 60000 - 1, einstellungen), false);
+  });
+
+  test('ohne letzte Position gibt es keine Luecke zu melden', () => {
+    gleich(istLuecke(null, 99999999, einstellungen), false);
+    gleich(istLuecke(undefined, 99999999, einstellungen), false);
+  });
+
+  test('Zeitstempel 0 zaehlt trotzdem als Zeitpunkt', () => {
+    // 0 ist falsy, darf aber nicht wie "keine Position" behandelt werden
+    gleich(istLuecke(0, 60000, einstellungen), false);
   });
 });
 

@@ -30,7 +30,7 @@
       Ortschaft aufzuzeichnen, solange du unterwegs bist.</p>
     <button id="btnEnable" class="btn btn-primary">Standort erlauben</button>
     <p id="permHint" class="hint"></p>
-    <p class="ver">Version v5</p>
+    <p class="ver">Version v6</p>
   </section>
 
   <main id="app" hidden>
@@ -61,6 +61,15 @@
           <input type="checkbox" id="wakeLock" />
           <span>Bildschirm während der Aufzeichnung wach halten</span>
         </label>
+
+        <p id="hintergrundHinweis" class="hinweis">
+          <button id="hinweisWeg" class="hinweis-weg" title="Hinweis ausblenden">✕</button>
+          Die Aufzeichnung läuft zuverlässig, solange WegLog im
+          <b>Vordergrund</b> und der Bildschirm an ist. Beim Wegschalten kann
+          das Betriebssystem die Standortabfrage drosseln; einzelne Wegpunkte
+          können dann fehlen. Solche Zeiträume markiert WegLog im Verlauf als
+          <b>Lücke</b> (⚠️), statt eine gerade Linie durch die Landschaft zu ziehen.
+        </p>
       </div>
 
       <div id="liveList" class="all-list"></div>
