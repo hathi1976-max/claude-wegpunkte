@@ -22,9 +22,12 @@ claude-wegpunkte/
 │   ├── test.html         Testlauf im Browser (kein node auf dem Zielrechner)
 │   ├── lauf.js           minimaler Testläufer
 │   ├── geo.test.js       Geometrie und Formatierung
-│   ├── tracking.test.js  Zustandsmaschine, Zustandsherstellung, Differenztest
-│   ├── storage.test.js   Persistenz gegen eine Speicher-Attrappe
+│   ├── tracking.test.js  Zustandsmaschine, Zustandsherstellung, Lücken, Differenztest
+│   ├── storage.test.js   Persistenz und voller Speicher gegen eine Attrappe
 │   ├── export.test.js    GPX/CSV/Sicherung, inkl. Fremdtext mit Markup
+│   ├── ui.test.js        Bau-Funktionen: Fremdtext bleibt Text (B1)
+│   ├── geocode.test.js   Nominatim gegen ein nachgebautes fetch, ohne Netz
+│   ├── version.test.js   Version, Vollständigkeit der App-Shell, Leaflet-Verweise
 │   └── referenz-alt.js   eingefrorene Tracking-Logik von vor dem Modul-Umbau
 ├── sw.js                 Service Worker (Offline-Cache der App-Shell)
 ├── manifest.webmanifest  PWA-Manifest
@@ -73,8 +76,8 @@ py -m http.server 5179
 ```
 
 im Projektordner starten, dann `http://localhost:5179` öffnen. Tests:
-`http://localhost:5179/tests/test.html`. Die Seite meldet oben
-„alle N Tests bestanden" bzw. die Fehlschläge; `window.__TESTERGEBNIS` hält das
+`http://localhost:5179/tests/test.html` — aktuell 127 Stück. Die Seite meldet
+oben „alle N Tests bestanden" bzw. die Fehlschläge; `window.__TESTERGEBNIS` hält das
 Ergebnis für eine Abfrage von außen bereit. Ein registrierter Service Worker
 wird von der Testseite vorher abgemeldet und der Cache geleert — sonst misst
 der Testlauf alten Code.
@@ -374,3 +377,37 @@ Block, nicht darin; er lief also bei jeder ausgewerteten Position, auch in der
 Pause. Die benachbarte, echte Macke war eine andere: nach dem **Stoppen** blieb
 der letzte Tempowert stehen, weil `renderLive` nur Anzahl und Strecke
 zurücksetzte. Genau das ist jetzt behoben.
+
+---
+
+## Prüfliste im Browser
+
+Was sich nicht automatisch prüfen lässt — GPS, Wake Lock, Service Worker,
+echte Netzabfragen — steht hier als Klickpfad. `py -m http.server 5179` starten,
+dann `http://localhost:5179`.
+
+**Zuerst:** `http://localhost:5179/tests/test.html` muss oben
+„alle 127 Tests bestanden" melden.
+
+| # | Klickpfad | Erwartung |
+| --- | --- | --- |
+| 1 | Seite laden, „Standort erlauben" | Live-Ansicht, GPS-Pille wird grün, Hinweis unter dem Start-Knopf sichtbar |
+| 2 | ✕ am Hinweis, dann neu laden | Hinweis bleibt weg |
+| 3 | ▶ Start, ~10 s warten, ■ Stopp | Start- und Ende-Punkt in der Liste, Verlauf bekommt einen Eintrag |
+| 4 | **B2:** Start, sofort Stopp, 2–3 s warten, **neu laden**, Verlaufseintrag öffnen → Karte | Der Ortsname steht noch am Punkt (vorher war er nach dem Neuladen weg) |
+| 5 | **A3:** Verlaufseintrag antippen → ⬇ GPX | Datei `weglog-JJJJ-MM-TT-hhmm.gpx` lädt herunter, öffnet sich in einem GPX-Betrachter |
+| 6 | **A3:** derselbe Eintrag → ⬇ CSV | Öffnet in einer Tabellenkalkulation mit sieben Spalten, Umlaute korrekt |
+| 7 | **A3:** ⚙︎ → „Alles sichern", dann „Sicherung einlesen" mit derselben Datei | Grünes Banner „0 neu, N schon vorhanden" — nichts wird verdoppelt |
+| 8 | **A2:** ⚙︎ öffnen | Speicherbalken und Text „Belegt: … KB von etwa 5 MB …, N Aufzeichnungen, M Wegpunkte" |
+| 9 | **A2:** „Älter als 90 Tage löschen" ohne alte Daten | Grünes Banner „Es gibt keine Aufzeichnung, die älter als 90 Tage ist." |
+| 10 | **A1:** Reiter Karte öffnen, dann in den Entwicklerwerkzeugen offline schalten und neu laden | App startet aus dem Cache, Karte zeigt die zuvor betrachteten Kacheln |
+| 11 | **A1:** offline auf einen unbekannten Kartenausschnitt schieben | Orangefarbener Hinweis „Offline – Kartenkacheln fehlen. Der aufgezeichnete Weg bleibt trotzdem gespeichert …" |
+| 12 | **B3:** Haken „Bildschirm wach halten", Aufzeichnung starten, App wegschalten und zurückkommen | In der Konsole „Wake Lock freigegeben", danach wird er ohne Zutun neu angefordert |
+| 13 | **B5:** Aufzeichnung starten, Gerät > 15 Min wegschalten, zurückkommen | Wegpunkt „Lücke" (⚠️) in der Liste, violetter Punkt auf der Karte |
+| 14 | **B4:** ⚙︎ → Kontakt-E-Mail eintragen, Aufzeichnung starten, Netzwerk-Tab ansehen | Die Nominatim-Anfrage trägt `&email=…`, und es geht höchstens eine Anfrage pro Sekunde raus |
+| 15 | **D:** Version unten im Berechtigungs-Bildschirm | Zeigt dieselbe Nummer wie `VERSION` in `sw.js` (aktuell `v8`) |
+
+Zu Punkt 4: Der Service Worker kann alten Code ausliefern. Zeigt die App nach
+einer Änderung altes Verhalten, in den Entwicklerwerkzeugen unter
+Anwendung → Service Workers abmelden und Caches leeren — `tests/test.html`
+macht genau das von selbst, bevor es die Module lädt.

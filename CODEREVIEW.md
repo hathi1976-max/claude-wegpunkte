@@ -13,6 +13,31 @@ Aufzeichnen unterwegs, offline und über längere Zeit.
 
 ---
 
+## Stand der Umsetzung (05.08.2026)
+
+**Alle zwölf Befunde erledigt** — A1–A3, B1–B5, C1–C3 und D. Umgesetzt in der
+unten empfohlenen Reihenfolge, beginnend mit dem bereits angefangenen
+Modul-Umbau (C1–C3).
+
+Aus einer Datei mit 582 Zeilen sind acht Module unter `js/` geworden, aus null
+Tests **127** in sieben Dateien (`tests/test.html` im Browser — auf diesem
+Rechner gibt es weder node noch npm). Kein Test geht ins Netz.
+
+Drei Stellen wurden **bewusst anders gelöst** als vorgeschlagen; die Begründung
+steht jeweils im Kasten des Befunds:
+
+- **A1.1** — Leaflet liegt nicht als Datei im Projekt, sondern wird vom Service
+  Worker beim Install in einen eigenen Cache geholt.
+- **A1.4** — der Kachelcache verwirft nach FIFO statt LRU.
+- **D7** — der Befund zu `updateStatSpeed` trifft so nicht zu; die benachbarte,
+  echte Macke (stehengebliebenes Tempo nach dem Stoppen) ist behoben.
+
+Was sich nicht automatisch prüfen lässt (GPS, Wake Lock, Service Worker, echte
+Netzabfragen), steht als Klickpfad in der Prüfliste am Ende von
+`ENTWICKLUNG.md`.
+
+---
+
 ## A. Kritisch
 
 ### A1. Die Karte funktioniert offline nicht — obwohl das der Anwendungsfall ist — ✅ erledigt 05.08.2026
@@ -440,7 +465,8 @@ sichtbar, wo Daten fehlen, statt eine gerade Linie durch die Landschaft zu ziehe
 > `<script type="module" src="js/app.js">`, alle sieben Dateien stehen in
 > `SHELL` in `sw.js` — die App bleibt offline vollständig.
 >
-> Aus null Tests sind **45** geworden (Stand dieses Schritts), in `tests/` mit
+> Aus null Tests sind **45** geworden (Stand dieses Schritts; am Ende des
+> Reviews sind es 127), in `tests/` mit
 > eigenem, abhängigkeitsfreiem Läufer (`tests/lauf.js`), aufrufbar über
 > `tests/test.html` im Browser — auf diesem Rechner gibt es weder node noch
 > npm. Abgedeckt: `haversine`, `sessionDistanceKm`, `computeSpeedKmh` samt
