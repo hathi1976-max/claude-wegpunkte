@@ -2,12 +2,18 @@
    Strategie: network-first für die eigene App (damit Updates sofort ankommen),
    Cache dient nur als Offline-Fallback. Karten-Tiles, Leaflet-CDN und Nominatim
    nie cachen – die müssen live sein bzw. sind zu groß/volatil für den Cache. */
-const CACHE = 'weglog-v1';
+const CACHE = 'weglog-v2';
 const SHELL = [
   './',
   './index.html',
   './style.css',
-  './app.js',
+  './js/app.js',
+  './js/geo.js',
+  './js/format.js',
+  './js/storage.js',
+  './js/tracking.js',
+  './js/geocode.js',
+  './js/ui.js',
   './manifest.webmanifest',
   './icon.svg',
   './icon-maskable.svg',
