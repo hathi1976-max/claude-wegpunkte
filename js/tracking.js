@@ -6,16 +6,20 @@
    passiert in app.js. */
 
 import {
-  computeSpeedKmh, intervalMsForSpeed,
+  computeSpeedKmh, intervalMsForSpeed, messbasisTaugt, hatSichEntfernt,
   pauseSpeedThreshold, resumeSpeedThreshold,
 } from './geo.js';
 
+/* speedRef ist die Bezugsposition der Geschwindigkeitsmessung (B6) – sie
+   haengt hinter lastRaw zurueck, solange die Strecke dazwischen im Rauschen
+   liegt. pauseAnchor ist der Ort, an dem der Stillstand begann; von ihm aus
+   wird gemessen, ob sich jemand doch fortbewegt hat. */
 export function neuerZustand(now){
-  return { zustand: 'moving', lastRaw: null, pauseSince: null, lastLogTime: now };
+  return { zustand: 'moving', lastRaw: null, speedRef: null, pauseSince: null, pauseAnchor: null, lastLogTime: now };
 }
 
 export function leerZustand(){
-  return { zustand: 'idle', lastRaw: null, pauseSince: null, lastLogTime: 0 };
+  return { zustand: 'idle', lastRaw: null, speedRef: null, pauseSince: null, pauseAnchor: null, lastLogTime: 0 };
 }
 
 /* Der Aufzeichnungszustand wird mit der Aufzeichnung gespeichert (siehe C3),
@@ -30,10 +34,13 @@ export function zustandAusAufzeichnung(aufzeichnung){
   }
   const punkte = aufzeichnung.points || [];
   const letzter = punkte[punkte.length - 1];
+  const roh = letzter ? { lat: letzter.lat, lon: letzter.lon, acc: letzter.acc, t: letzter.t } : null;
   return {
     zustand: letzter && letzter.type === 'pause' ? 'paused' : 'moving',
-    lastRaw: letzter ? { lat: letzter.lat, lon: letzter.lon, acc: letzter.acc, t: letzter.t } : null,
+    lastRaw: roh,
+    speedRef: roh,
     pauseSince: null,
+    pauseAnchor: null,
     lastLogTime: letzter ? letzter.t : aufzeichnung.startTime,
   };
 }
@@ -70,28 +77,42 @@ export function baueWegpunkt(type, coords, speedKmh, now){
 /* Verarbeitet eine GPS-Position und liefert den Folgezustand samt der dabei
    entstandenen Wegpunkte. Der Aufrufer schreibt sie weg und zeichnet neu.
 
-   zst    – {zustand, lastRaw, pauseSince, lastLogTime}
+   zst    – {zustand, lastRaw, speedRef, pauseSince, pauseAnchor, lastLogTime}
    liefert {zst, punkte, speedKmh, ausgewertet} */
 export function schrittPosition(zst, coords, now, settings){
-  const speedKmh = computeSpeedKmh(coords, now, zst.lastRaw);
+  const ref = zst.speedRef || zst.lastRaw;
+  const speedKmh = computeSpeedKmh(coords, now, ref);
   const raw = { lat: coords.latitude, lon: coords.longitude, acc: coords.accuracy, t: now };
+  const speedRef = messbasisTaugt(ref, coords, now) ? raw : ref;
 
   if (zst.zustand === 'idle'){
-    return { zst: { ...zst, lastRaw: raw }, punkte: [], speedKmh, ausgewertet: false };
+    return { zst: { ...zst, lastRaw: raw, speedRef }, punkte: [], speedKmh, ausgewertet: false };
   }
 
-  let { zustand, pauseSince, lastLogTime } = zst;
+  let { zustand, pauseSince, pauseAnchor, lastLogTime } = zst;
   const punkte = [];
 
-  if (speedKmh < pauseSpeedThreshold){
+  /* Zweiter Weg neben der Geschwindigkeit (B6): bei grober Ortung ohne
+     Geraetetempo bleibt jede Strecke unter dem Rauschboden, das Tempo kommt
+     dann immer als 0 heraus – und die Aufzeichnung waere nach pauseMin fuer
+     immer in der Pause. Wo ein Tempo messbar war, entscheidet weiter allein
+     die Hysterese; wo nicht, zaehlt der Ortswechsel gegenueber dem Punkt, an
+     dem der Stillstand begann. */
+  const ortGewechselt = speedKmh === 0 && hatSichEntfernt(pauseAnchor, coords);
+
+  if (speedKmh < pauseSpeedThreshold && !ortGewechselt){
     if (pauseSince === null) pauseSince = now;
+    // Getrennt geprueft: eine aus der Zeit vor B6 wiederhergestellte Pause hat
+    // eine Pausenuhr, aber noch keinen Ort – ohne ihn bliebe sie ewig bestehen.
+    if (!pauseAnchor) pauseAnchor = raw;
     if (zustand === 'moving' && (now - pauseSince) >= settings.pauseMin * 60000){
       zustand = 'paused';
       punkte.push(baueWegpunkt('pause', coords, speedKmh, now));
     }
   } else {
     pauseSince = null;
-    if (zustand === 'paused' && speedKmh >= resumeSpeedThreshold){
+    pauseAnchor = null;
+    if (zustand === 'paused' && (speedKmh >= resumeSpeedThreshold || ortGewechselt)){
       zustand = 'moving';
       lastLogTime = now;
       punkte.push(baueWegpunkt('resume', coords, speedKmh, now));
@@ -106,7 +127,7 @@ export function schrittPosition(zst, coords, now, settings){
   }
 
   return {
-    zst: { zustand, lastRaw: raw, pauseSince, lastLogTime },
+    zst: { zustand, lastRaw: raw, speedRef, pauseSince, pauseAnchor, lastLogTime },
     punkte,
     speedKmh,
     ausgewertet: true,

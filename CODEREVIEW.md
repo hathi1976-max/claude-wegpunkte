@@ -15,12 +15,13 @@ Aufzeichnen unterwegs, offline und über längere Zeit.
 
 ## Stand der Umsetzung (05.08.2026)
 
-**Alle zwölf Befunde erledigt** — A1–A3, B1–B5, C1–C3 und D. Umgesetzt in der
+**Alle zwölf Befunde erledigt** — A1–A3, B1–B5, C1–C3 und D. Später kam **B6**
+dazu, kein Review-Befund, sondern im Einsatz aufgefallen (30.08.2026). Umgesetzt in der
 unten empfohlenen Reihenfolge, beginnend mit dem bereits angefangenen
 Modul-Umbau (C1–C3).
 
 Aus einer Datei mit 582 Zeilen sind acht Module unter `js/` geworden, aus null
-Tests **127** in sieben Dateien (`tests/test.html` im Browser — auf diesem
+Tests **132** in sieben Dateien (`tests/test.html` im Browser — auf diesem
 Rechner gibt es weder node noch npm). Kein Test geht ins Netz.
 
 Drei Stellen wurden **bewusst anders gelöst** als vorgeschlagen; die Begründung
@@ -450,6 +451,44 @@ einmalig in der App (Hinweis unter dem Start-Knopf) klarstellen:
 Und: nach dem Wiedereinblenden prüfen, ob eine große Zeitlücke entstanden ist,
 und diese als eigenen Punkttyp (`luecke`) protokollieren — dann ist im Verlauf
 sichtbar, wo Daten fehlen, statt eine gerade Linie durch die Landschaft zu ziehen.
+
+---
+
+### B6. Gehen im Sekundentakt zählt als Stillstand — ✅ erledigt 30.08.2026
+
+*Nicht aus dem Review — im Einsatz aufgefallen (30.08.2026): eine Aufzeichnung
+enthielt nur zwei Wegpunkte, Start und Pause.*
+
+> **Behoben.**
+>
+> **Ursache:** `computeSpeedKmh` rechnete gegen die zuletzt empfangene
+> Position. `watchPosition` liefert im Sekundentakt; zwei Fixes eines
+> Fußgängers liegen dann ein bis zwei Meter auseinander und damit unter dem
+> Jitter-Boden von 10–30 m. Ohne `coords.speed` vom Gerät kam so bei **jeder**
+> Position 0 km/h heraus: nach `pauseMin` fiel der Pausenpunkt, und aus
+> `paused` führten nur gemessene 2 km/h heraus, die es aus demselben Grund nie
+> geben konnte. Ab da stand die Aufzeichnung endgültig.
+>
+> **Messbasis statt Vorgängerposition:** Der Zustand führt `speedRef`. Diese
+> Bezugsposition rückt erst nach, wenn die Strecke über dem Rauschboden liegt
+> oder `messfensterMs` (30 s) verstrichen sind — lang genug, dass Gehtempo
+> messbar wird, kurz genug, dass Losgehen nicht verwaschen wird.
+>
+> **Ortswechsel als zweiter Weg:** Wo sich gar kein Tempo messen lässt (grobe
+> Ortung ohne `coords.speed`), entscheidet der Abstand zum `pauseAnchor` — dem
+> Ort, an dem der Stillstand begann. Mehr als `max(25 m, Rauschboden)` heißt
+> unterwegs. Wo ein Tempo messbar war, entscheidet weiter allein die Hysterese;
+> der Test „1,67 km/h beendet die Pause nicht" gilt unverändert.
+>
+> **Warum kein Test das fand:** Alle Spuren — die konstruierten wie die
+> gesäten Zufallsspuren — lagen im Minutenabstand. Bei 60 s Abstand liegt
+> Gehtempo weit über dem Rauschboden; der Fehler existiert nur im
+> Sekundentakt. Neu sind sieben Tests mit Spuren im Sekundentakt, darunter
+> einer, der den eingefrorenen alten Stand auf derselben Gehspur stehenbleiben
+> sieht. Der Differenztest gegen `referenz-alt.js` ist dafür entfallen: er
+> hielt genau das Verhalten fest, das hier zu ändern war.
+
+**Wo:** `js/geo.js:computeSpeedKmh`, `js/tracking.js:schrittPosition`
 
 ---
 

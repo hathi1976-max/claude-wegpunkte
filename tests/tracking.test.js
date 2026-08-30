@@ -1,6 +1,7 @@
 import { gruppe, test, gleich, tiefGleich, wahr } from './lauf.js';
 import {
-  schrittPosition, zustandAusAufzeichnung, leerZustand, istLuecke, lueckenSchwelleMs,
+  schrittPosition, zustandAusAufzeichnung, neuerZustand, leerZustand, istLuecke,
+  lueckenSchwelleMs,
 } from '../js/tracking.js';
 import { erstelleAltenTracker } from './referenz-alt.js';
 
@@ -9,7 +10,7 @@ const einstellungen = { walkInt: 5, bikeInt: 2, carInt: 1, pauseMin: 3, useGeoco
 /* Faehrt eine Spur durch die neue Zustandsmaschine und schreibt mit,
    was dabei herauskommt. */
 function laufeNeu(spur, settings, start){
-  let zst = { zustand: 'moving', lastRaw: null, pauseSince: null, lastLogTime: start };
+  let zst = neuerZustand(start);
   const punkte = [];
   const speeds = [];
   for (const pos of spur){
@@ -102,7 +103,8 @@ gruppe('zustandAusAufzeichnung', () => {
   });
 
   test('gespeicherter Zustand wird unveraendert uebernommen', () => {
-    const gespeichert = { zustand: 'paused', lastRaw: { lat: 52, lon: 13, acc: 9, t: 500 }, pauseSince: 400, lastLogTime: 300 };
+    const gespeichert = { ...leerZustand(), zustand: 'paused',
+      lastRaw: { lat: 52, lon: 13, acc: 9, t: 500 }, pauseSince: 400, lastLogTime: 300 };
     const aufz = { id: 1, startTime: 0, points: [{ t: 100, type: 'log', lat: 1, lon: 2, acc: 3 }], zustand: gespeichert };
     tiefGleich(zustandAusAufzeichnung(aufz), gespeichert);
   });
@@ -208,22 +210,13 @@ function baueZufallsspur(seed, schritte){
   return spur;
 }
 
-gruppe('Differenztest neu gegen alt', () => {
-  test('20 Zufallsspuren liefern identische Wegpunkte', () => {
-    for (let seed = 1; seed <= 20; seed++){
-      const spur = baueZufallsspur(seed, 300);
-      const alt = laufeAlt(spur, einstellungen, 0);
-      const neu = laufeNeu(spur, einstellungen, 0);
-      tiefGleich(neu.punkte, alt.punkte, `Wegpunkte bei Seed ${seed}`);
-      tiefGleich(neu.speeds, alt.speeds, `Geschwindigkeiten bei Seed ${seed}`);
-      gleich(neu.zst.zustand, alt.zustand.trackState, `Endzustand bei Seed ${seed}`);
-      gleich(neu.zst.pauseSince, alt.zustand.pauseSince, `pauseSince bei Seed ${seed}`);
-      gleich(neu.zst.lastLogTime, alt.zustand.lastLogTime, `lastLogTime bei Seed ${seed}`);
-    }
-  });
-
+/* Die Zufallsspuren stammen aus dem Modul-Umbau, wo sie den neuen Stand gegen
+   den alten stellten. Seit B6 weichen beide bewusst voneinander ab (siehe
+   unten); geblieben ist die Gegenprobe, dass die Spuren ueberhaupt Wegpunkte
+   aller Sorten erzeugen. */
+gruppe('Zufallsspuren', () => {
   test('Zufallsspuren erzeugen ueberhaupt Wegpunkte aller Sorten', () => {
-    // Ohne diese Kontrolle koennte der Differenztest zwei leere Listen vergleichen
+    // Sonst koennte eine Spur alle Sorten verlieren, ohne dass es auffaellt
     const alle = new Set();
     for (let seed = 1; seed <= 20; seed++){
       laufeNeu(baueZufallsspur(seed, 300), einstellungen, 0).punkte.forEach(p => alle.add(p.type));
@@ -233,17 +226,112 @@ gruppe('Differenztest neu gegen alt', () => {
     wahr(alle.has('resume'), 'keine resume-Punkte in den Zufallsspuren');
   });
 
-  test('auch mit abweichenden Einstellungen identisch', () => {
-    const varianten = [
-      { walkInt: 1, bikeInt: 1, carInt: 1, pauseMin: 1, useGeocode: false },
-      { walkInt: 15, bikeInt: 10, carInt: 10, pauseMin: 15, useGeocode: false },
-    ];
-    for (const s of varianten){
-      for (let seed = 30; seed <= 35; seed++){
-        const spur = baueZufallsspur(seed, 200);
-        tiefGleich(laufeNeu(spur, s, 0).punkte, laufeAlt(spur, s, 0).punkte,
-          `Seed ${seed}, pauseMin ${s.pauseMin}`);
-      }
+});
+
+/* ---------- Sekundentakt: der Befund vom 30.08.2026 (B6) ----------
+
+   watchPosition liefert im Sekundentakt. Alle Spuren oben liegen im
+   Minutenabstand – deshalb ist nie aufgefallen, dass zwei Positionen im
+   Sekundenabstand beim Gehen naeher beieinanderliegen als die GPS-Genauigkeit
+   und die Geschwindigkeit damit immer 0 ergibt. */
+
+/* Gleichmaessige Fahrt nach Norden, Positionen alle dtSek Sekunden. Ohne
+   coords.speed – genau der Fall, in dem gerechnet werden muss. */
+function fahrSpur({ dtSek, acc, kmh, minuten, rauschen = 0, seed = 12345 }){
+  const spur = [];
+  const mProSchritt = (kmh / 3.6) * dtSek;
+  let lat = 52, t = 0, s = seed;
+  const rnd = () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296; };
+  for (let i = 1; i <= Math.round(minuten * 60 / dtSek); i++){
+    t += dtSek * 1000;
+    lat += mProSchritt / 111194.93;
+    spur.push(pos(t,
+      lat + (rnd() - 0.5) * rauschen / 111194.93,
+      13 + (rnd() - 0.5) * rauschen / 111194.93,
+      acc));
+  }
+  return spur;
+}
+
+function artenZaehlen(punkte){
+  const zaehler = {};
+  for (const p of punkte) zaehler[p.type] = (zaehler[p.type] || 0) + 1;
+  return zaehler;
+}
+
+gruppe('Gehen im Sekundentakt (B6)', () => {
+  const gehen = fahrSpur({ dtSek: 2, acc: 15, kmh: 5, minuten: 30, rauschen: 6 });
+
+  test('30 Minuten Gehen ergeben sechs Wegpunkte, kein Steckenbleiben', () => {
+    const { punkte, zst } = laufeNeu(gehen, einstellungen, 0);
+    tiefGleich(artenZaehlen(punkte), { log: 6 }, 'Wegpunktarten');
+    gleich(zst.zustand, 'moving', 'Endzustand');
+  });
+
+  test('der Stand vor B6 blieb hier nach pauseMin stehen', () => {
+    // Genau der gemeldete Fehler: ein Pausenpunkt, danach nie wieder etwas.
+    const { punkte, zustand } = laufeAlt(gehen, einstellungen, 0);
+    tiefGleich(artenZaehlen(punkte), { pause: 1 }, 'Wegpunktarten (alter Stand)');
+    gleich(zustand.trackState, 'paused', 'Endzustand (alter Stand)');
+  });
+
+  test('grobe Ortung ohne messbares Tempo: der Ortswechsel traegt', () => {
+    // Bei 150 m Ungenauigkeit bleibt jede Gehstrecke unter dem Rauschboden,
+    // die Geschwindigkeit ist also nicht zu messen. Der Abstand zum Ort, an
+    // dem der Stillstand begann, ist es sehr wohl.
+    const grob = fahrSpur({ dtSek: 5, acc: 150, kmh: 5, minuten: 30 });
+    const { punkte, speeds, zst } = laufeNeu(grob, einstellungen, 0);
+    wahr(speeds.every(v => v === 0), 'Tempo war wider Erwarten messbar');
+    tiefGleich(artenZaehlen(punkte), { log: 6 }, 'Wegpunktarten');
+    gleich(zst.zustand, 'moving', 'Endzustand');
+  });
+
+  test('Radtempo im Sekundentakt nimmt den Radtakt', () => {
+    const rad = fahrSpur({ dtSek: 2, acc: 15, kmh: 18, minuten: 30, rauschen: 6 });
+    const { punkte } = laufeNeu(rad, einstellungen, 0);
+    const arten = artenZaehlen(punkte);
+    // bikeInt = 2 Min -> 15 Wegpunkte in 30 Min; einer weniger, wenn der erste
+    // erst faellt, sobald sich das Tempo ueberhaupt messen laesst
+    wahr(arten.log === 15 || arten.log === 14, 'Wegpunkte im Radtakt: ' + arten.log);
+    gleich(arten.pause, undefined, 'kein Pausenpunkt beim Radfahren');
+  });
+
+  test('Stillstand im Sekundentakt ergibt weiterhin genau eine Pause', () => {
+    const stehen = fahrSpur({ dtSek: 2, acc: 15, kmh: 0, minuten: 20, rauschen: 8 });
+    const { punkte, zst } = laufeNeu(stehen, einstellungen, 0);
+    tiefGleich(artenZaehlen(punkte), { pause: 1 }, 'Wegpunktarten');
+    gleich(zst.zustand, 'paused', 'Endzustand');
+  });
+
+  test('eine aus der Zeit vor B6 geerbte Pause bleibt nicht kleben', () => {
+    /* Wer beim Umstieg mitten in der haengengebliebenen Pause steckte, hat
+       einen Zustand ohne pauseAnchor gespeichert. Auch der muss wieder
+       herausfinden, wenn sich das Tempo nicht messen laesst. */
+    const geerbt = { ...leerZustand(), zustand: 'paused', pauseSince: 0, lastLogTime: 0 };
+    let zst = geerbt;
+    const punkte = [];
+    for (const p of fahrSpur({ dtSek: 5, acc: 150, kmh: 5, minuten: 20 })){
+      const e = schrittPosition(zst, p.coords, p.timestamp, einstellungen);
+      zst = e.zst;
+      punkte.push(...e.punkte);
     }
+    gleich(artenZaehlen(punkte).resume, 1, 'kein Weiter-Punkt');
+    gleich(zst.zustand, 'moving', 'Endzustand');
+  });
+
+  test('aus der Pause holt ein belegter Ortswechsel zurueck', () => {
+    // Erst zehn Minuten stehen, dann losgehen – ohne Geraetetempo.
+    const spur = [
+      ...fahrSpur({ dtSek: 2, acc: 15, kmh: 0, minuten: 10, rauschen: 8 }),
+    ];
+    const startT = spur[spur.length - 1].timestamp;
+    const weiter = fahrSpur({ dtSek: 2, acc: 15, kmh: 5, minuten: 20, rauschen: 6 });
+    for (const p of weiter) spur.push(pos(startT + p.timestamp, p.coords.latitude, p.coords.longitude, 15));
+    const { punkte, zst } = laufeNeu(spur, einstellungen, 0);
+    const arten = artenZaehlen(punkte);
+    gleich(arten.pause, 1, 'genau ein Pausenpunkt');
+    gleich(arten.resume, 1, 'genau ein Weiter-Punkt');
+    wahr(arten.log >= 3, 'zu wenige Wegpunkte nach dem Weitergehen: ' + arten.log);
+    gleich(zst.zustand, 'moving', 'Endzustand');
   });
 });

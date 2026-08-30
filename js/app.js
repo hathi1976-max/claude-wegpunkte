@@ -133,7 +133,7 @@ function handlePosition(pos){
       // Die Luecke ist der Wegpunkt dieses Moments; und was waehrend der
       // Drosselung passierte, wissen wir nicht – also auch keine Pause behaupten.
       laufendeAufzeichnung.zustand = {
-        ...laufendeAufzeichnung.zustand, lastLogTime: now, pauseSince: null,
+        ...laufendeAufzeichnung.zustand, lastLogTime: now, pauseSince: null, pauseAnchor: null,
       };
     }
   }
@@ -171,8 +171,9 @@ function startTracking(){
       if (!laufendeAufzeichnung) return;   // zwischenzeitlich gestoppt
       const t = Date.now();
       nimmWegpunktAuf(baueWegpunkt('start', pos.coords, 0, t));
-      laufendeAufzeichnung.zustand.lastRaw =
-        { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t };
+      const roh = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy, t };
+      laufendeAufzeichnung.zustand.lastRaw = roh;
+      laufendeAufzeichnung.zustand.speedRef = roh;
     },
     handlePositionError,
     { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }

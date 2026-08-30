@@ -1,6 +1,6 @@
 # WegLog – Entwicklungsdokumentation
 
-Stand: August 2026. Vanilla-Web-App ohne Framework, ohne Build-Schritt, ohne
+Stand: 30.08.2026. Vanilla-Web-App ohne Framework, ohne Build-Schritt, ohne
 Abhängigkeiten. Alle Dateien sind statisch auslieferbar.
 
 ## Projektstruktur
@@ -22,7 +22,7 @@ claude-wegpunkte/
 │   ├── test.html         Testlauf im Browser (kein node auf dem Zielrechner)
 │   ├── lauf.js           minimaler Testläufer
 │   ├── geo.test.js       Geometrie und Formatierung
-│   ├── tracking.test.js  Zustandsmaschine, Zustandsherstellung, Lücken, Differenztest
+│   ├── tracking.test.js  Zustandsmaschine, Zustandsherstellung, Lücken, Sekundentakt
 │   ├── storage.test.js   Persistenz und voller Speicher gegen eine Attrappe
 │   ├── export.test.js    GPX/CSV/Sicherung, inkl. Fremdtext mit Markup
 │   ├── ui.test.js        Bau-Funktionen: Fremdtext bleibt Text (B1)
@@ -52,14 +52,28 @@ Drei Schichten, absichtlich getrennt:
 
 ### Aufzeichnungszustand
 
-`{ zustand: 'idle'|'moving'|'paused', lastRaw, pauseSince, lastLogTime }` hängt
-als `laufendeAufzeichnung.zustand` an der Aufzeichnung und wird mit ihr
-gespeichert. Ein Neuladen stellt damit exakt den vorherigen Stand her, ohne aus
-dem letzten Wegpunkt zu raten.
+`{ zustand: 'idle'|'moving'|'paused', lastRaw, speedRef, pauseSince,
+pauseAnchor, lastLogTime }` hängt als `laufendeAufzeichnung.zustand` an der
+Aufzeichnung und wird mit ihr gespeichert. Ein Neuladen stellt damit exakt den
+vorherigen Stand her, ohne aus dem letzten Wegpunkt zu raten.
 
 Hysterese gegen Pausen-Flackern: unter 1 km/h beginnt die Pausenuhr, erst ab
 2 km/h endet die Pause wieder. Der Jitter-Filter verwirft Bewegungen unterhalb
 der gemittelten GPS-Ungenauigkeit beider Positionen.
+
+Zwei Vorkehrungen dagegen, dass der Jitter-Filter jede Bewegung schluckt (B6):
+
+- **`speedRef` — Messbasis statt Vorgängerposition.** Die Geschwindigkeit wird
+  nicht gegen die zuletzt empfangene Position gerechnet, sondern gegen eine
+  Bezugsposition, die erst nachrückt, wenn die Strecke über dem Rauschboden
+  liegt oder `messfensterMs` (30 s) verstrichen sind. Bei Positionen im
+  Sekundentakt liegen zwei Fixes eines Fußgängers sonst immer näher beieinander
+  als die GPS-Genauigkeit — das Tempo käme dauerhaft als 0 heraus.
+- **`pauseAnchor` — Ortswechsel als zweiter Weg.** Wo sich gar kein Tempo
+  messen lässt (grobe Ortung, kein `coords.speed`), entscheidet der Abstand zu
+  dem Punkt, an dem der Stillstand begann: mehr als `max(25 m, Rauschboden)`
+  heißt unterwegs. Wo ein Tempo messbar war, entscheidet weiter allein die
+  Hysterese.
 
 ## PWA
 
@@ -76,7 +90,7 @@ py -m http.server 5179
 ```
 
 im Projektordner starten, dann `http://localhost:5179` öffnen. Tests:
-`http://localhost:5179/tests/test.html` — aktuell 127 Stück. Die Seite meldet
+`http://localhost:5179/tests/test.html` — aktuell 132 Stück. Die Seite meldet
 oben „alle N Tests bestanden" bzw. die Fehlschläge; `window.__TESTERGEBNIS` hält das
 Ergebnis für eine Abfrage von außen bereit. Ein registrierter Service Worker
 wird von der Testseite vorher abgemeldet und der Cache geleert — sonst misst
@@ -380,6 +394,57 @@ zurücksetzte. Genau das ist jetzt behoben.
 
 ---
 
+## Nach dem Review
+
+### 30.08.2026 — B6: Gehen im Sekundentakt wurde als Pause gelesen
+
+**Befund aus dem Einsatz.** Eine Aufzeichnung enthielt nur zwei Wegpunkte:
+Start und Pause. Danach kam nichts mehr, egal wie lange gelaufen wurde.
+
+**Ursache.** `computeSpeedKmh` rechnete gegen die *zuletzt empfangene*
+Position. `watchPosition` liefert im Sekundentakt; ein Fußgänger legt in dieser
+Zeit ein bis zwei Meter zurück, der Jitter-Filter verwirft alles unterhalb der
+gemittelten GPS-Genauigkeit (10–30 m). Ergebnis: 0 km/h bei jeder Position,
+sobald das Gerät kein eigenes `coords.speed` meldet. Nach `pauseMin` fiel der
+Pausenpunkt, und aus `paused` führte nur eine gemessene Geschwindigkeit von
+2 km/h heraus — die es aus demselben Grund nie geben konnte. Die Aufzeichnung
+war damit endgültig stehengeblieben.
+
+Warum das kein Test gefunden hat: **alle** konstruierten Spuren und alle
+Zufallsspuren lagen im Minutenabstand. Bei 60 s Abstand liegt schon Gehtempo
+weit über dem Rauschboden — der Fehler existiert nur im Sekundentakt.
+
+**Geändert.** Zwei Ergänzungen, beide in den reinen Modulen (siehe
+„Aufzeichnungszustand"): die Bezugsposition `speedRef` mit einem Messfenster
+von 30 s, und der `pauseAnchor` als zweiter Weg über den Ortswechsel. Der
+Zustand trägt beide Felder mit; Aufzeichnungen ohne sie werden von
+`zustandAusAufzeichnung` ergänzt.
+
+**Geprüft.** Sieben neue Tests in `tests/tracking.test.js` mit Spuren im
+Sekundentakt (`fahrSpur`), nachgerechnet gegen den Aufruf von Hand:
+
+| Spur (30 Min, ohne `coords.speed`) | vorher | jetzt |
+| --- | --- | --- |
+| Gehen 5 km/h, Genauigkeit 15 m, alle 2 s | 1× `pause`, dann nichts | 6× `log`, Zustand `moving` |
+| Gehen 5 km/h, Genauigkeit 150 m, alle 5 s | 1× `pause`, dann nichts | 6× `log` (über den Ortswechsel) |
+| Radtempo 18 km/h, alle 2 s | — | 14–15× `log` (Radtakt) |
+| Stillstand mit ±4 m Rauschen | 1× `pause` | 1× `pause` (unverändert) |
+| Stillstand, dann Losgehen | — | `pause`, `resume`, dann `log` |
+
+Der Differenztest gegen `tests/referenz-alt.js` konnte nicht bleiben: er hielt
+genau das Verhalten fest, das hier zu ändern war. An seine Stelle tritt ein
+Test, der den alten Stand auf derselben Gehspur laufen lässt und festhält, dass
+er stehenblieb — der Befund ist damit dauerhaft dokumentiert statt eingefroren.
+Die Zufallsspuren bleiben als Gegenprobe, dass überhaupt Wegpunkte aller Sorten
+entstehen. 132 Tests, alle grün.
+
+**Offen geblieben.** Steht das Gerät still und rauscht die Ortung um die
+gemeldete Genauigkeit herum (±10 m bei gemeldeten 15 m), wird die Pause nicht
+erkannt — es fallen dann Wegpunkte am selben Ort. Das war vorher genauso und
+ist die harmlosere Hälfte des Problems.
+
+---
+
 ## Prüfliste im Browser
 
 Was sich nicht automatisch prüfen lässt — GPS, Wake Lock, Service Worker,
@@ -387,7 +452,7 @@ echte Netzabfragen — steht hier als Klickpfad. `py -m http.server 5179` starte
 dann `http://localhost:5179`.
 
 **Zuerst:** `http://localhost:5179/tests/test.html` muss oben
-„alle 127 Tests bestanden" melden.
+„alle 132 Tests bestanden" melden.
 
 | # | Klickpfad | Erwartung |
 | --- | --- | --- |
@@ -405,7 +470,9 @@ dann `http://localhost:5179`.
 | 12 | **B3:** Haken „Bildschirm wach halten", Aufzeichnung starten, App wegschalten und zurückkommen | In der Konsole „Wake Lock freigegeben", danach wird er ohne Zutun neu angefordert |
 | 13 | **B5:** Aufzeichnung starten, Gerät > 15 Min wegschalten, zurückkommen | Wegpunkt „Lücke" (⚠️) in der Liste, violetter Punkt auf der Karte |
 | 14 | **B4:** ⚙︎ → Kontakt-E-Mail eintragen, Aufzeichnung starten, Netzwerk-Tab ansehen | Die Nominatim-Anfrage trägt `&email=…`, und es geht höchstens eine Anfrage pro Sekunde raus |
-| 15 | **D:** Version unten im Berechtigungs-Bildschirm | Zeigt dieselbe Nummer wie `VERSION` in `sw.js` (aktuell `v8`) |
+| 15 | **D:** Version unten im Berechtigungs-Bildschirm | Zeigt dieselbe Nummer wie `VERSION` in `sw.js` (aktuell `v9`) |
+| 16 | **B6:** Aufzeichnung starten und 10–15 Min zu Fuß gehen, Bildschirm an | Alle 5 Min ein Wegpunkt, Zustand bleibt „Unterwegs"; **kein** Pausenpunkt nach 3 Min |
+| 17 | **B6:** danach 5 Min stehen bleiben | Nach 3 Min Pausenpunkt, Zustand „Pause"; beim Weitergehen ein „Weiter"-Punkt |
 
 Zu Punkt 4: Der Service Worker kann alten Code ausliefern. Zeigt die App nach
 einer Änderung altes Verhalten, in den Entwicklerwerkzeugen unter

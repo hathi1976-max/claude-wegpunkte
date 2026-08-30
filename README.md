@@ -81,7 +81,7 @@ es **HTTPS** (z. B. Hosting wie GitHub Pages).
 
 ## Vor jeder Freigabe (Checkliste)
 
-1. `VERSION` in `sw.js` hochzählen (`v8` → `v9` …).
+1. `VERSION` in `sw.js` hochzählen (`v9` → `v10` …).
 2. Dieselbe Zeichenkette in `index.html` bei `<p class="ver">` nachziehen.
 3. Neue Dateien unter `js/` in `SHELL` in `sw.js` eintragen — **sonst ist die
    App offline kaputt**.
