@@ -90,7 +90,7 @@ py -m http.server 5179
 ```
 
 im Projektordner starten, dann `http://localhost:5179` öffnen. Tests:
-`http://localhost:5179/tests/test.html` — aktuell 132 Stück. Die Seite meldet
+`http://localhost:5179/tests/test.html` — aktuell 134 Stück. Die Seite meldet
 oben „alle N Tests bestanden" bzw. die Fehlschläge; `window.__TESTERGEBNIS` hält das
 Ergebnis für eine Abfrage von außen bereit. Ein registrierter Service Worker
 wird von der Testseite vorher abgemeldet und der Cache geleert — sonst misst
@@ -445,6 +445,51 @@ ist die harmlosere Hälfte des Problems.
 
 ---
 
+### 31.08.2026 — B7: Der Bildschirm muss anbleiben, also bleibt er an
+
+**Feldtest zu B6 bestanden.** Beim Spaziergang loggt WegLog wieder normal —
+aber nur, solange das Display aktiv bleibt.
+
+**Das ist keine Folge von B6, sondern die bekannte Grenze aus B5:** Geht der
+Bildschirm aus oder wandert die App in den Hintergrund, drosselt oder stoppt
+das Betriebssystem `watchPosition`. Daran kommt keine PWA vorbei.
+
+**Fixbar war der Teil davor.** Der Haken „Bildschirm während der Aufzeichnung
+wach halten" war per Vorgabe **aus** und wurde als einzige Einstellung **nicht**
+in `weglog.settings` gemerkt — nach jedem Neuladen stand er wieder leer. Wer ihn
+vergaß, verlor die Aufzeichnung, sobald der Bildschirm ausging, und merkte es
+erst hinterher an den fehlenden Wegpunkten.
+
+**Geändert:**
+
+- `storage.js` — neue Einstellung `wachHalten`, Vorgabe **`true`**. Der
+  Normalfall beim Aufzeichnen ist, dass der Bildschirm anbleiben soll; wer lange
+  fährt, schaltet es ab, und die Entscheidung überlebt das Neuladen.
+- `app.js` — der Haken schreibt seine Stellung in die Einstellungen und wird
+  beim Start daraus gesetzt. Neu `meldeWakeLockFehlt()`: Scheitert der Wake Lock
+  (Browser kann es nicht, Anfrage abgelehnt), erscheint ein **Banner** statt
+  einer Zeile in der Konsole, die niemand sieht. Einmal je Aufzeichnung — der
+  Lock wird beim Zurückschalten in den Vordergrund erneut angefordert, und bei
+  jedem Fehlversuch zu melden wäre Lärm.
+- `app.js` — ist der Haken beim Start bewusst aus, sagt ein Banner, was das
+  bedeutet: „Geht der Bildschirm aus, pausiert die Aufzeichnung."
+- `index.html` — Kästchen mit `checked` vorbelegt, damit vor dem ersten
+  Skriptlauf nichts anderes dasteht als hinterher.
+
+**Geprüft.** Zwei neue Tests in `tests/storage.test.js` (134 insgesamt): Die
+Vorgabe `wachHalten: true` ist als bewusste Entscheidung festgehalten, und eine
+abgeschaltete Einstellung übersteht das Neuladen, ohne die übrigen Vorgaben zu
+verlieren. Im Browser nachgestellt: Haken aus → Neuladen → bleibt aus →
+wieder an → wird gespeichert. Beide Banner ausgelöst, das zweite mit
+weggenommenem `navigator.wakeLock`.
+
+**Nicht gemacht.** Tricks, die Hintergrund-Tracking vortäuschen (stille
+Audioschleife, Wecker-Intervalle) — sie funktionieren auf iOS/Android nicht
+verlässlich und würden ein Versprechen geben, das die Plattform nicht hält.
+Fehlende Zeiträume markiert WegLog weiterhin als ⚠️-Lücke.
+
+---
+
 ## Prüfliste im Browser
 
 Was sich nicht automatisch prüfen lässt — GPS, Wake Lock, Service Worker,
@@ -452,7 +497,7 @@ echte Netzabfragen — steht hier als Klickpfad. `py -m http.server 5179` starte
 dann `http://localhost:5179`.
 
 **Zuerst:** `http://localhost:5179/tests/test.html` muss oben
-„alle 132 Tests bestanden" melden.
+„alle 134 Tests bestanden" melden.
 
 | # | Klickpfad | Erwartung |
 | --- | --- | --- |
@@ -470,9 +515,11 @@ dann `http://localhost:5179`.
 | 12 | **B3:** Haken „Bildschirm wach halten", Aufzeichnung starten, App wegschalten und zurückkommen | In der Konsole „Wake Lock freigegeben", danach wird er ohne Zutun neu angefordert |
 | 13 | **B5:** Aufzeichnung starten, Gerät > 15 Min wegschalten, zurückkommen | Wegpunkt „Lücke" (⚠️) in der Liste, violetter Punkt auf der Karte |
 | 14 | **B4:** ⚙︎ → Kontakt-E-Mail eintragen, Aufzeichnung starten, Netzwerk-Tab ansehen | Die Nominatim-Anfrage trägt `&email=…`, und es geht höchstens eine Anfrage pro Sekunde raus |
-| 15 | **D:** Version unten im Berechtigungs-Bildschirm | Zeigt dieselbe Nummer wie `VERSION` in `sw.js` (aktuell `v9`) |
+| 15 | **D:** Version unten im Berechtigungs-Bildschirm | Zeigt dieselbe Nummer wie `VERSION` in `sw.js` (aktuell `v10`) |
 | 16 | **B6:** Aufzeichnung starten und 10–15 Min zu Fuß gehen, Bildschirm an | Alle 5 Min ein Wegpunkt, Zustand bleibt „Unterwegs"; **kein** Pausenpunkt nach 3 Min |
 | 17 | **B6:** danach 5 Min stehen bleiben | Nach 3 Min Pausenpunkt, Zustand „Pause"; beim Weitergehen ein „Weiter"-Punkt |
+| 18 | **B7:** Haken „Bildschirm wach halten" abwählen, neu laden | Haken bleibt aus (wird gemerkt) |
+| 19 | **B7:** mit abgewähltem Haken ▶ Start | Orangefarbenes Banner „Der Bildschirm wird nicht wach gehalten …" |
 
 Zu Punkt 4: Der Service Worker kann alten Code ausliefern. Zeigt die App nach
 einer Änderung altes Verhalten, in den Entwicklerwerkzeugen unter

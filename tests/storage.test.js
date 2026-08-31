@@ -47,6 +47,21 @@ const beispielPunkt = { t: 1000, lat: 52.5, lon: 13.4, acc: 12, speedKmh: 5.4, t
 gruppe('storage: Einstellungen', () => {
   test('leerer Speicher liefert die Vorgaben', () => {
     mitAttrappe({}, () => tiefGleich(speicher.loadSettings(), speicher.defaultSettings));
+
+  test('Bildschirm wach halten ist per Vorgabe an', () => {
+    /* Bewusste Entscheidung, kein Zufall: ohne Wake Lock bleibt die
+       Aufzeichnung stehen, sobald der Bildschirm ausgeht — und das faellt
+       erst hinterher an den fehlenden Wegpunkten auf. */
+    gleich(speicher.defaultSettings.wachHalten, true);
+  });
+
+  test('abgeschaltetes Wachhalten ueberlebt das Neuladen', () => {
+    mitAttrappe({ 'weglog.settings': JSON.stringify({ wachHalten: false }) }, () => {
+      gleich(speicher.loadSettings().wachHalten, false);
+      gleich(speicher.loadSettings().walkInt, speicher.defaultSettings.walkInt,
+        'uebrige Vorgaben bleiben');
+    });
+  });
   });
 
   test('gespeicherte Werte ueberschreiben nur einzelne Felder', () => {

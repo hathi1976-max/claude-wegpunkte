@@ -21,7 +21,7 @@ unten empfohlenen Reihenfolge, beginnend mit dem bereits angefangenen
 Modul-Umbau (C1–C3).
 
 Aus einer Datei mit 582 Zeilen sind acht Module unter `js/` geworden, aus null
-Tests **132** in sieben Dateien (`tests/test.html` im Browser — auf diesem
+Tests **134** in sieben Dateien (`tests/test.html` im Browser — auf diesem
 Rechner gibt es weder node noch npm). Kein Test geht ins Netz.
 
 Drei Stellen wurden **bewusst anders gelöst** als vorgeschlagen; die Begründung
@@ -489,6 +489,30 @@ enthielt nur zwei Wegpunkte, Start und Pause.*
 > hielt genau das Verhalten fest, das hier zu ändern war.
 
 **Wo:** `js/geo.js:computeSpeedKmh`, `js/tracking.js:schrittPosition`
+
+---
+
+### B7. Der Wake-Lock-Haken war aus und wurde nicht gemerkt — ✅ erledigt 31.08.2026
+
+*Nicht aus dem Review — beim Feldtest zu B6 aufgefallen (31.08.2026):
+„funktioniert, wenn das Display aktiv bleibt".*
+
+> **Behoben.**
+>
+> Dass die Aufzeichnung ein aktives Display braucht, ist die Grenze aus B5 und
+> nicht zu beheben. Der Haken davor schon: „Bildschirm während der Aufzeichnung
+> wach halten" war per Vorgabe **aus** und als einzige Einstellung **nicht** in
+> `weglog.settings` gemerkt. Nach jedem Neuladen stand er wieder leer — wer ihn
+> vergaß, verlor die Aufzeichnung beim nächsten Bildschirm-Timeout und merkte
+> es erst an den fehlenden Wegpunkten.
+>
+> Jetzt: Einstellung `wachHalten` mit Vorgabe **`true`**, gemerkt wie alle
+> anderen. Scheitert der Wake Lock, erscheint ein **Banner** statt einer
+> Konsolenzeile (einmal je Aufzeichnung). Ist der Haken bewusst aus, sagt beim
+> Start ein Banner, was das bedeutet.
+
+**Wo:** `js/storage.js:defaultSettings`, `js/app.js:requestWakeLock`,
+`js/app.js:startTracking`
 
 ---
 

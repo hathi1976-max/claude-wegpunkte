@@ -33,8 +33,11 @@ Uhrzeit und Ortschaft protokolliert – bis du sie aktiv stoppst.
   App gewechselt) wird von iOS/Android irgendwann gedrosselt oder beendet –
   eine PWA kann GPS nicht zuverlässig unbegrenzt im Hintergrund verfolgen.
   Die Option „Bildschirm wach halten" (Wake Lock) hilft, solange die App im
-  Vordergrund ist, ersetzt aber kein natives Hintergrund-Tracking. Der Lock
-  wird beim Zurückkommen aus dem Hintergrund automatisch neu angefordert.
+  Vordergrund ist, ersetzt aber kein natives Hintergrund-Tracking. Sie ist
+  **per Vorgabe eingeschaltet** und wird gemerkt; ausgeschaltet warnt WegLog
+  beim Start der Aufzeichnung. Der Lock wird beim Zurückkommen aus dem
+  Hintergrund automatisch neu angefordert; klappt er nicht, erscheint ein
+  Banner statt nur einer Konsolenmeldung.
 - Fehlen dadurch Wegpunkte, wird die Zeitspanne beim Zurückkommen als eigener
   Wegpunkt **„Lücke" (⚠️)** protokolliert – statt eine gerade Linie durch die
   Landschaft zu ziehen, als wäre man sie so gefahren. Schwelle: das Dreifache
@@ -81,7 +84,7 @@ es **HTTPS** (z. B. Hosting wie GitHub Pages).
 
 ## Vor jeder Freigabe (Checkliste)
 
-1. `VERSION` in `sw.js` hochzählen (`v9` → `v10` …).
+1. `VERSION` in `sw.js` hochzählen (`v10` → `v11` …).
 2. Dieselbe Zeichenkette in `index.html` bei `<p class="ver">` nachziehen.
 3. Neue Dateien unter `js/` in `SHELL` in `sw.js` eintragen — **sonst ist die
    App offline kaputt**.

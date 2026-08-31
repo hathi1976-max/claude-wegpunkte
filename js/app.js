@@ -180,7 +180,15 @@ function startTracking(){
   );
 
   attachWatcher();
-  if (ui.$('#wakeLock').checked) requestWakeLock();
+  wakeLockGemeldet = false;
+  if (ui.$('#wakeLock').checked){
+    requestWakeLock();
+  } else {
+    // Bewusst abgeschaltet ist in Ordnung – aber die Folge muss dabeistehen.
+    ui.zeigeBanner('Der Bildschirm wird nicht wach gehalten. Geht er aus, '
+      + 'pausiert die Aufzeichnung, bis WegLog wieder im Vordergrund ist.',
+      'warn', 10000);
+  }
   ui.updateLiveState();
   ui.renderLive();
 }
@@ -240,10 +248,19 @@ function detachWatcher(){
   if (watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
 }
 
+/* Meldung nur einmal je Aufzeichnung: Der Wake Lock wird beim Zurueckschalten
+   in den Vordergrund erneut angefordert, und bei jedem Fehlversuch ein Banner
+   zu zeigen waere Laerm statt Information. */
+let wakeLockGemeldet = false;
+
 async function requestWakeLock(){
-  if (!navigator.wakeLock) return;
+  if (!navigator.wakeLock){
+    meldeWakeLockFehlt('Dieser Browser kann den Bildschirm nicht wach halten.');
+    return;
+  }
   try {
     wakeLockSentinel = await navigator.wakeLock.request('screen');
+    wakeLockGemeldet = false;
     // Protokollieren, wann er verloren ging – sonst ist im Fehlerfall nicht
     // nachvollziehbar, warum der Bildschirm ausging.
     wakeLockSentinel.addEventListener('release', () => {
@@ -252,7 +269,19 @@ async function requestWakeLock(){
   } catch (e){
     wakeLockSentinel = null;
     console.warn('Wake Lock nicht erhalten', e);
+    meldeWakeLockFehlt('Der Bildschirm lässt sich nicht wach halten '
+      + (e && e.message ? '(' + e.message + ')' : '') + '.');
   }
+}
+
+/* Ohne diese Meldung merkt man den fehlenden Wake Lock erst hinterher an den
+   fehlenden Wegpunkten — der Bildschirm geht einfach aus. */
+function meldeWakeLockFehlt(grund){
+  if (wakeLockGemeldet || !laufendeAufzeichnung) return;
+  wakeLockGemeldet = true;
+  ui.zeigeBanner(grund + ' Geht der Bildschirm aus, pausiert die Aufzeichnung. '
+    + 'Bitte das Gerät wach halten (z. B. Bildschirm-Timeout hochsetzen).',
+    'warn', 12000);
 }
 
 function releaseWakeLock(){
@@ -272,10 +301,14 @@ document.addEventListener('visibilitychange', () => {
   if (ui.$('#wakeLock').checked && wakeLockFehlt()) requestWakeLock();
 });
 
-/* Der Haken soll auch mitten in der Fahrt wirken, nicht erst beim naechsten Start. */
+/* Der Haken soll auch mitten in der Fahrt wirken, nicht erst beim naechsten
+   Start – und die Entscheidung ueberlebt das Neuladen. */
+ui.$('#wakeLock').checked = settings.wachHalten;
 ui.$('#wakeLock').addEventListener('change', () => {
+  settings.wachHalten = ui.$('#wakeLock').checked;
+  speicher.saveSettings(settings);
   if (!laufendeAufzeichnung) return;
-  if (ui.$('#wakeLock').checked) requestWakeLock();
+  if (settings.wachHalten){ wakeLockGemeldet = false; requestWakeLock(); }
   else releaseWakeLock();
 });
 

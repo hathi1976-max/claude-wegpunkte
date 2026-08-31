@@ -23,6 +23,12 @@ export const defaultSettings = {
   carInt: 1,    // Min, > bikeMax
   pauseMin: 3,  // Min Stillstand bis 'Pause'
   useGeocode: true,
+  /* Der Bildschirm bleibt waehrend der Aufzeichnung an. Vorgabe 'true', weil
+     eine Aufzeichnung ohne Wake Lock stehenbleibt, sobald der Bildschirm
+     ausgeht — und das faellt erst hinterher auf, wenn Wegpunkte fehlen. Kostet
+     Akku; wer lange faehrt, schaltet es ab, und die Entscheidung wird
+     gemerkt. */
+  wachHalten: true,
   startHinweisWeg: false,   // Hinweis zur Hintergrund-Aufzeichnung ausgeblendet
   kontakt: '',              // E-Mail-Kennung fuer Nominatim (B4), leer = keine
 };
